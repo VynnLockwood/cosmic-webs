@@ -1,0 +1,9 @@
+.superpowers/
+node_modules/
+target/
+__pycache__/
+.pytest_cache/
+*.pyc
+web/src/wasm/
+web/dist/
+.venv/

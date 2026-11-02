@@ -93,3 +93,16 @@ def test_rows_unknown_table_404(shop_client):
 
 def test_rows_limit_capped_200(shop_client):
     assert len(shop_client.get("/api/tables/public.users/rows", params={"limit": 9999}).json()["rows"]) == 200
+
+
+def test_sandbox_session_is_unprivileged_and_read_only(shop_db, monkeypatch):
+    """The sandbox user is a superuser; sessions that run user-supplied SELECTs must not be."""
+    dsn, graph = shop_db
+    monkeypatch.setenv("SANDBOX_DSN", dsn)
+    registry.use_sandbox()
+    with registry.session() as s:
+        assert s.execute("select count(*) from users").fetchone()[0] == 1000
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            s.execute("select pg_read_file('/etc/hostname')")
+        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            s.execute("update users set name = 'x'")

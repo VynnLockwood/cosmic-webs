@@ -51,7 +51,14 @@ class SourceRegistry:
         if self.mode == "live" and self.live:
             conn = self._connect_live(self.live)
         else:
+            from .sandbox import READER, ensure_reader_role
+
             conn = psycopg.connect(os.environ["SANDBOX_DSN"], autocommit=True)
+            # the sandbox user is a superuser: drop to an unprivileged, read-only role before any user SQL runs
+            ensure_reader_role(conn)
+            conn.execute(f"SET ROLE {READER}")
+            conn.execute("SET default_transaction_read_only = on")
+            conn.execute("SET statement_timeout = '30s'")
         try:
             yield conn
         finally:

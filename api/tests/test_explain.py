@@ -5,6 +5,7 @@ from psycopg.conninfo import conninfo_to_dict
 
 from app.explain import to_driver_sql
 from app.main import app
+from app.sandbox import grant_reader
 from app.sources import LiveParams, registry
 
 USERS = 'SELECT "t0"."id" FROM "public"."users" AS "t0"'
@@ -42,6 +43,7 @@ def test_dollar_params_and_percent_identifier(pg_dsn, monkeypatch):
     with psycopg.connect(pg_dsn, autocommit=True) as c:
         c.execute('create table "50%" (x int)')
         c.execute('insert into "50%" select generate_series(1,10)')
+        grant_reader(c)  # tables made outside rebuild_sandbox need the reader grants
     monkeypatch.setenv("SANDBOX_DSN", pg_dsn)
     r = TestClient(app).post("/api/run", json={"query": {"sql": 'SELECT "t0"."x" FROM "public"."50%" AS "t0" WHERE "t0"."x" >= $1 AND "t0"."x" <= $1', "params": [5]}})
     assert r.json()["rows"] == [[5]]

@@ -1,0 +1,1208 @@
+{
+  "tables": [
+    {
+      "name": "public.users",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.addresses",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "line1",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.categories",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.suppliers",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "contact_email",
+          "type": "text",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.products",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "supplier_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "price",
+          "type": "numeric",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "attrs",
+          "type": "jsonb",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.product_categories",
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "category_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.tags",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.product_tags",
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "tag_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.warehouses",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.inventory",
+      "columns": [
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "warehouse_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "quantity",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.orders",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "billing_address_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "shipping_address_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "status",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "label",
+          "type": "order_status_label",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "total",
+          "type": "numeric",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "placed_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.order_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "warehouse_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "qty",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "unit_price",
+          "type": "numeric",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.payments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "method",
+          "type": "payment_method",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "paid_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.shipments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "warehouse_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "tracking",
+          "type": "uuid",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "shipped_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.refunds",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "payment_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "amount",
+          "type": "numeric",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.reviews",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "rating",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.carts",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.cart_items",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "cart_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "qty",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.coupons",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "percent_off",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.order_coupons",
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "coupon_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.wishlists",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "product_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.departments",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "head_id",
+          "type": "int4",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.employees",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "department_id",
+          "type": "int4",
+          "nullable": true,
+          "pk": false
+        },
+        {
+          "name": "manager_id",
+          "type": "int4",
+          "nullable": true,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.invoices",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "order_id",
+          "type": "int4",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "issued_by",
+          "type": "int4",
+          "nullable": true,
+          "pk": false
+        },
+        {
+          "name": "issued_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    },
+    {
+      "name": "public.audit_log",
+      "columns": [
+        {
+          "name": "id",
+          "type": "int4",
+          "nullable": false,
+          "pk": true
+        },
+        {
+          "name": "user_id",
+          "type": "int4",
+          "nullable": true,
+          "pk": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false,
+          "pk": false
+        },
+        {
+          "name": "at",
+          "type": "timestamptz",
+          "nullable": false,
+          "pk": false
+        }
+      ],
+      "row_estimate": 0
+    }
+  ],
+  "fks": [
+    {
+      "id": "fk_addresses_user_id",
+      "from": {
+        "table": "public.addresses",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_products_supplier_id",
+      "from": {
+        "table": "public.products",
+        "columns": [
+          "supplier_id"
+        ]
+      },
+      "to": {
+        "table": "public.suppliers",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_product_categories_product_id",
+      "from": {
+        "table": "public.product_categories",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_product_categories_category_id",
+      "from": {
+        "table": "public.product_categories",
+        "columns": [
+          "category_id"
+        ]
+      },
+      "to": {
+        "table": "public.categories",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_product_tags_product_id",
+      "from": {
+        "table": "public.product_tags",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_product_tags_tag_id",
+      "from": {
+        "table": "public.product_tags",
+        "columns": [
+          "tag_id"
+        ]
+      },
+      "to": {
+        "table": "public.tags",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_inventory_product_id",
+      "from": {
+        "table": "public.inventory",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_inventory_warehouse_id",
+      "from": {
+        "table": "public.inventory",
+        "columns": [
+          "warehouse_id"
+        ]
+      },
+      "to": {
+        "table": "public.warehouses",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_orders_user_id",
+      "from": {
+        "table": "public.orders",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_orders_billing_address_id",
+      "from": {
+        "table": "public.orders",
+        "columns": [
+          "billing_address_id"
+        ]
+      },
+      "to": {
+        "table": "public.addresses",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_orders_shipping_address_id",
+      "from": {
+        "table": "public.orders",
+        "columns": [
+          "shipping_address_id"
+        ]
+      },
+      "to": {
+        "table": "public.addresses",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_order_items_order_id",
+      "from": {
+        "table": "public.order_items",
+        "columns": [
+          "order_id"
+        ]
+      },
+      "to": {
+        "table": "public.orders",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_order_items_product_id_warehouse_id",
+      "from": {
+        "table": "public.order_items",
+        "columns": [
+          "product_id",
+          "warehouse_id"
+        ]
+      },
+      "to": {
+        "table": "public.inventory",
+        "columns": [
+          "product_id",
+          "warehouse_id"
+        ]
+      }
+    },
+    {
+      "id": "fk_payments_order_id",
+      "from": {
+        "table": "public.payments",
+        "columns": [
+          "order_id"
+        ]
+      },
+      "to": {
+        "table": "public.orders",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_shipments_order_id",
+      "from": {
+        "table": "public.shipments",
+        "columns": [
+          "order_id"
+        ]
+      },
+      "to": {
+        "table": "public.orders",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_shipments_warehouse_id",
+      "from": {
+        "table": "public.shipments",
+        "columns": [
+          "warehouse_id"
+        ]
+      },
+      "to": {
+        "table": "public.warehouses",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_refunds_payment_id",
+      "from": {
+        "table": "public.refunds",
+        "columns": [
+          "payment_id"
+        ]
+      },
+      "to": {
+        "table": "public.payments",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_reviews_user_id",
+      "from": {
+        "table": "public.reviews",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_reviews_product_id",
+      "from": {
+        "table": "public.reviews",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_carts_user_id",
+      "from": {
+        "table": "public.carts",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_cart_items_cart_id",
+      "from": {
+        "table": "public.cart_items",
+        "columns": [
+          "cart_id"
+        ]
+      },
+      "to": {
+        "table": "public.carts",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_cart_items_product_id",
+      "from": {
+        "table": "public.cart_items",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_order_coupons_order_id",
+      "from": {
+        "table": "public.order_coupons",
+        "columns": [
+          "order_id"
+        ]
+      },
+      "to": {
+        "table": "public.orders",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_order_coupons_coupon_id",
+      "from": {
+        "table": "public.order_coupons",
+        "columns": [
+          "coupon_id"
+        ]
+      },
+      "to": {
+        "table": "public.coupons",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_wishlists_user_id",
+      "from": {
+        "table": "public.wishlists",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_wishlists_product_id",
+      "from": {
+        "table": "public.wishlists",
+        "columns": [
+          "product_id"
+        ]
+      },
+      "to": {
+        "table": "public.products",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_employees_department_id",
+      "from": {
+        "table": "public.employees",
+        "columns": [
+          "department_id"
+        ]
+      },
+      "to": {
+        "table": "public.departments",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_employees_manager_id",
+      "from": {
+        "table": "public.employees",
+        "columns": [
+          "manager_id"
+        ]
+      },
+      "to": {
+        "table": "public.employees",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_departments_head",
+      "from": {
+        "table": "public.departments",
+        "columns": [
+          "head_id"
+        ]
+      },
+      "to": {
+        "table": "public.employees",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_invoices_order_id",
+      "from": {
+        "table": "public.invoices",
+        "columns": [
+          "order_id"
+        ]
+      },
+      "to": {
+        "table": "public.orders",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_invoices_issued_by",
+      "from": {
+        "table": "public.invoices",
+        "columns": [
+          "issued_by"
+        ]
+      },
+      "to": {
+        "table": "public.employees",
+        "columns": [
+          "id"
+        ]
+      }
+    },
+    {
+      "id": "fk_audit_log_user_id",
+      "from": {
+        "table": "public.audit_log",
+        "columns": [
+          "user_id"
+        ]
+      },
+      "to": {
+        "table": "public.users",
+        "columns": [
+          "id"
+        ]
+      }
+    }
+  ]
+}

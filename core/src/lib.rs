@@ -3,6 +3,7 @@ pub mod diagnose;
 pub mod graph;
 pub mod layout;
 pub mod paths;
+pub mod rank;
 pub mod search;
 pub mod sqlgen;
 pub mod types;

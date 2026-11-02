@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
+import { useSearchHighlight } from "./search/useHighlight";
 import { motionActions } from "./scene/camera/motion";
 import Scene from "./scene/Scene";
 import { SKY_ONLY } from "./scene/e2eHook";
@@ -30,6 +31,7 @@ export default function App() {
     }
   }, []);
   useShortcuts(onAction);
+  useSearchHighlight();
   return (
     <div style={{ position: "fixed", inset: 0 }} onDoubleClick={() => !useStore.getState().hoveredTable && motionActions.resetView()}>
       <Scene />

@@ -24,7 +24,7 @@ export function SearchPanel() {
     setBusy(true);
     try {
       const out = await runSearch(req);
-      s.setResults(out.ranked, out.flags);
+      s.setResults(out.ranked, out.flags, { candidates: out.candidates, costs: out.costs });
       s.setDrawer("results");
     } catch (e: any) {
       setErrors([String(e?.message ?? e)]);

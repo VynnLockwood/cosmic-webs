@@ -1,0 +1,107 @@
+"""Cross-language contract: Rust planner/ranker <-> Python API <-> real Postgres (no WASM needed)."""
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.sources import registry
+
+ROOT = Path(__file__).resolve().parents[2]
+CLI = ROOT / "core/target/release/examples/cli"
+
+pytestmark = pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+
+
+@pytest.fixture(scope="module")
+def cli():
+    subprocess.run(["cargo", "build", "--release", "--example", "cli", "--manifest-path", str(ROOT / "core/Cargo.toml")], check=True, capture_output=True)
+    return CLI
+
+
+def call(cli, mode, payload):
+    out = subprocess.run([str(cli), mode], input=json.dumps(payload), capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+@pytest.fixture
+def client(shop_db, monkeypatch):
+    dsn, graph = shop_db
+    monkeypatch.setenv("SANDBOX_DSN", dsn)
+    registry.use_sandbox()
+    registry.graph = graph
+    yield TestClient(app), graph.model_dump(by_alias=True)
+    registry.use_sandbox()
+    registry.graph = None
+
+
+def pipeline(cli, c, graph, request):
+    cands = call(cli, "plan", {"graph": graph, "request": request})
+    assert cands, "planner returned no candidates"
+    explain = c.post("/api/explain", json={"candidates": cands}).json()["results"]
+    costs = [{"id": r["id"], "total_cost": r["total_cost"], "plan_rows": r["plan_rows"], "error": (r["error"] or {}).get("code") if r["error"] and r["error"]["code"] in ("PERMISSION", "TIMEOUT") else ("TYPE_MISMATCH" if r["error"] else None)} for r in explain]
+    return cands, explain, call(cli, "rank", {"candidates": cands, "costs": costs})
+
+
+def test_multi_hop_search_plans_explain_rank_and_run(cli, client):
+    c, graph = client
+    request = {"select": ["public.users.email", "public.orders.total", "public.products.name"], "where": {"col": "public.orders.status", "cmp": "=", "value": 0}, "fk_choices": {}}
+    flags = call(cli, "diagnose", {"graph": graph, "request": request})
+    assert [f["code"] for f in flags] == [], flags
+    cands, explain, out = pipeline(cli, c, graph, request)
+    assert all(r["error"] is None for r in explain), explain
+    ranked = out["ranked"]
+    assert 1 <= len(ranked) <= 5 and ranked == sorted(ranked, key=lambda r: r["score"])
+    best = next(x for x in cands if x["id"] == ranked[0]["id"])
+    for q in best["queries"]:
+        res = c.post("/api/run", json={"query": q, "limit": 10}).json()
+        assert res["row_count"] >= 0 and res["columns"]
+    assert any("JOIN" in q["sql"] for x in cands for q in x["queries"])
+
+
+def test_every_candidate_shape_explains_and_runs(cli, client):
+    c, graph = client
+    request = {"select": ["public.users.email", "public.orders.total"], "where": {"op": "AND", "children": [
+        {"col": "public.users.name", "cmp": "ILIKE", "value": "%a%"}, {"col": "public.orders.status", "cmp": "<=", "value": 2}]}, "fk_choices": {}}
+    cands, explain, _ = pipeline(cli, c, graph, request)
+    assert {x["shape"] for x in cands} >= {"Join"}
+    for cand in cands:
+        for q in cand["queries"]:
+            r = c.post("/api/run", json={"query": q, "limit": 5})
+            assert r.status_code == 200, (cand["shape"], q["sql"], r.text)
+
+
+def test_ambiguous_fk_flag_and_choice(cli, client):
+    c, graph = client
+    request = {"select": ["public.addresses.city", "public.orders.total"], "where": None, "fk_choices": {}}
+    flags = call(cli, "diagnose", {"graph": graph, "request": request})
+    assert "AMBIGUOUS_FK" in [f["code"] for f in flags]
+    names = {f["id"] for f in graph["fks"] if f["from"]["table"] == "public.orders" and f["to"]["table"] == "public.addresses"}
+    assert len(names) == 2
+    chosen = {**request, "fk_choices": {"public.addresses|public.orders": sorted(names)[0]}}
+    assert "AMBIGUOUS_FK" not in [f["code"] for f in call(cli, "diagnose", {"graph": graph, "request": chosen})]
+    cands, explain, out = pipeline(cli, c, graph, chosen)
+    assert out["ranked"] and all(r["error"] is None for r in explain)
+
+
+def test_unreachable_table_is_flagged_and_dropped(cli, client):
+    c, graph = client
+    graph = {**graph, "tables": graph["tables"] + [{"name": "public.island", "columns": [{"name": "x", "type": "text", "nullable": True, "pk": False}], "row_estimate": 0}]}
+    request = {"select": ["public.users.email", "public.island.x"], "where": None, "fk_choices": {}}
+    flags = call(cli, "diagnose", {"graph": graph, "request": request})
+    assert [f["code"] for f in flags] == ["UNREACHABLE"] and flags[0]["table"] == "public.island"
+    cands = call(cli, "plan", {"graph": graph, "request": request})
+    assert cands and all("island" not in q["sql"] for x in cands for q in x["queries"])
+
+
+def test_values_with_quotes_and_percent_stay_params(cli, client):
+    c, graph = client
+    evil = "x' OR 1=1 --; %"
+    request = {"select": ["public.users.email"], "where": {"col": "public.users.name", "cmp": "ILIKE", "value": evil}, "fk_choices": {}}
+    cands, explain, out = pipeline(cli, c, graph, request)
+    assert all(evil not in q["sql"] for x in cands for q in x["queries"])
+    q = next(x for x in cands if x["id"] == out["ranked"][0]["id"])["queries"][0]
+    assert c.post("/api/run", json={"query": q}).json()["row_count"] == 0

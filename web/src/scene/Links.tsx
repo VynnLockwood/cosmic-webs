@@ -6,6 +6,7 @@ import { motion } from "./camera/motion";
 import { DOT_SCALE, dotRadius, linkStyle, type LinkState } from "./style";
 
 const LOOP = 12;
+const SLOTS = 16; // a link is drawn as 16 sub-segments so it can be dashed
 
 export function Links() {
   const graph = useStore((s) => s.graph)!;
@@ -17,7 +18,7 @@ export function Links() {
     }),
     [graph, idx],
   );
-  const segCount = links.reduce((n, l) => n + (l.a === l.b ? LOOP : 1), 0);
+  const segCount = links.reduce((n, l) => n + (l.a === l.b ? LOOP : SLOTS), 0);
   const geo = useMemo(() => {
     const g = new BufferGeometry();
     g.setAttribute("position", new BufferAttribute(new Float32Array(segCount * 6), 3));
@@ -49,8 +50,14 @@ export function Links() {
           put([pa[0] + Math.cos(a1) * r, pa[1] + r + Math.sin(a1) * r, pa[2]]);
         }
       } else {
-        put(pa);
-        put([positions[l.b * 3] * k, positions[l.b * 3 + 1] * k, positions[l.b * 3 + 2] * k]);
+        const pb = [positions[l.b * 3] * k, positions[l.b * 3 + 1] * k, positions[l.b * 3 + 2] * k];
+        const at = (u: number) => [pa[0] + (pb[0] - pa[0]) * u, pa[1] + (pb[1] - pa[1]) * u, pa[2] + (pb[2] - pa[2]) * u];
+        for (let j = 0; j < SLOTS; j++) {
+          // solid: slot 0 spans the link, others collapse; dashed: even slots drawn, odd collapse
+          const [u0, u1] = st.dashed ? (j % 2 === 0 ? [j / SLOTS, (j + 1) / SLOTS] : [0, 0]) : j === 0 ? [0, 1] : [0, 0];
+          put(at(u0));
+          put(at(u1));
+        }
       }
     }
     pos.needsUpdate = col.needsUpdate = true;

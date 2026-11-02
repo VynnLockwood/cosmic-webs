@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
-import type { Flag, Ranked, SchemaGraph, SearchRequest } from "../types";
+import type { Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "search" | "results" | "settings" | null;
 export type TierSetting = "auto" | "high" | "medium" | "low";
@@ -23,6 +23,11 @@ export interface State {
   /** table whose detail panel is open (set when the fly-in arrives) */
   panelTable: string | null;
   setPanelTable(n: string | null): void;
+  schemaError: SchemaError | null;
+  liveError: string | null;
+  warnings: string[];
+  /** performance.now() of the last data-source switch (drives the 0.6 s shimmer) */
+  shimmerAt: number;
   layoutSettled: boolean;
   setLayoutSettled(v: boolean): void;
   flyingIn: boolean;
@@ -59,6 +64,10 @@ export const useStore = create<State>((set) => ({
   tier: initialTier(),
   dotOverrides: {},
   linkOverrides: {},
+  schemaError: null,
+  liveError: null,
+  warnings: [],
+  shimmerAt: -1e9,
   layoutSettled: false,
   setLayoutSettled: (layoutSettled) => set({ layoutSettled }),
   panelTable: null,

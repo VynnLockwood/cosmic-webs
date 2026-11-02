@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { motionActions } from "./scene/camera/motion";
 import Scene from "./scene/Scene";
+import { SKY_ONLY } from "./scene/e2eHook";
+import { Drawer } from "./ui/Drawer";
+import { Hud } from "./ui/Hud";
+import { Rail } from "./ui/Rail";
+import { TablePanel } from "./ui/TablePanel";
+import "./ui/theme.css";
 import { useShortcuts, type Action } from "./shortcuts";
 import { useStore } from "./store/useStore";
 
@@ -27,6 +33,14 @@ export default function App() {
   return (
     <div style={{ position: "fixed", inset: 0 }} onDoubleClick={() => !useStore.getState().hoveredTable && motionActions.resetView()}>
       <Scene />
+      {!SKY_ONLY && (
+        <div className="ui-layer">
+          <Rail />
+          <Drawer />
+          <TablePanel />
+          <Hud />
+        </div>
+      )}
       {error && <div style={{ position: "absolute", top: 16, left: 80, color: "#FF5C6C" }}>Could not load schema: {error}</div>}
     </div>
   );

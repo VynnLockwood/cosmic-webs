@@ -24,6 +24,7 @@ export function Dots() {
     const { positions, hoveredTable, selectedTable, dotOverrides } = useStore.getState();
     if (positions.length !== n * 3 || !core.current) return;
     const t = clock.elapsedTime;
+    const shimmer = Math.max(0, 1 - (performance.now() - useStore.getState().shimmerAt) / 600);
     for (let i = 0; i < n; i++) {
       const name = graph.tables[i].name;
       const state: DotState = dotOverrides[name] ?? (name === selectedTable ? "selected" : name === hoveredTable ? "hover" : "idle");
@@ -37,7 +38,7 @@ export function Dots() {
       o.updateMatrix();
       core.current.setMatrixAt(i, o.matrix);
       core.current.setColorAt(i, tmp.c.copy(tmp.white).multiplyScalar(st.opacity));
-      o.scale.setScalar(Math.max(r * 1.5 * st.glow, 1e-4));
+      o.scale.setScalar(Math.max(r * 1.5 * st.glow * (1 + 0.8 * shimmer * Math.abs(Math.sin(t * 14 + i))), 1e-4));
       o.updateMatrix();
       halo.current.setMatrixAt(i, o.matrix);
       halo.current.setColorAt(i, tmp.c.copy(colors[i]).multiplyScalar(st.opacity));

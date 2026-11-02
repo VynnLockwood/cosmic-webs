@@ -11,7 +11,7 @@
     "allowJs": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["vite/client", "vitest/globals"],
+    "types": ["vite/client", "vitest/globals", "node"],
     "paths": { "@wasm/*": ["./src/wasm-stub/*"] }
   },
   "include": ["src", "e2e"]

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { DotState, LinkState } from "../scene/style";
 import type { Flag, Ranked, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "search" | "results" | "settings" | null;
@@ -16,6 +17,10 @@ export interface State {
   flags: Flag[];
   tier: TierSetting;
   reducedMotion: boolean;
+  /** per-table / per-fk visual overrides set by search, flags and fly-in */
+  dotOverrides: Record<string, DotState>;
+  linkOverrides: Record<string, LinkState>;
+  setOverrides(d: Record<string, DotState>, l: Record<string, LinkState>): void;
   setGraph(g: SchemaGraph): void;
   setPositions(p: Float32Array): void;
   selectTable(name: string | null): void;
@@ -39,8 +44,11 @@ export const useStore = create<State>((set) => ({
   results: [],
   flags: [],
   tier: "auto",
+  dotOverrides: {},
+  linkOverrides: {},
+  setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, results: [], flags: [], searchRequest: null }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, results: [], flags: [], searchRequest: null, dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

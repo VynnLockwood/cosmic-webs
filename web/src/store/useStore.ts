@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
+import type { Draft } from "../ui/search/draft";
 import type { Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "search" | "results" | "settings" | null;
@@ -23,6 +24,13 @@ export interface State {
   /** table whose detail panel is open (set when the fly-in arrives) */
   panelTable: string | null;
   setPanelTable(n: string | null): void;
+  /** search builder state (kept here so closing the drawer does not lose it) */
+  searchSelect: string[];
+  searchDraft: Draft | null;
+  fkChoices: Record<string, string>;
+  setSearchSelect(v: string[]): void;
+  setSearchDraft(d: Draft | null): void;
+  setFkChoices(c: Record<string, string>): void;
   schemaError: SchemaError | null;
   liveError: string | null;
   warnings: string[];
@@ -64,6 +72,12 @@ export const useStore = create<State>((set) => ({
   tier: initialTier(),
   dotOverrides: {},
   linkOverrides: {},
+  searchSelect: [],
+  searchDraft: null,
+  fkChoices: {},
+  setSearchSelect: (searchSelect) => set({ searchSelect }),
+  setSearchDraft: (searchDraft) => set({ searchDraft }),
+  setFkChoices: (fkChoices) => set({ fkChoices }),
   schemaError: null,
   liveError: null,
   warnings: [],
@@ -76,7 +90,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], flags: [], searchRequest: null, dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

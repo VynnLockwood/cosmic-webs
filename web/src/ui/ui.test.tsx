@@ -33,7 +33,7 @@ test("ddl_error_shows_line_and_keeps_graph", async () => {
 
 test("table_panel_shows_pk_fk_badges", async () => {
   useStore.setState({ graph, panelTable: "public.orders" });
-  const api = { getRows: async () => ({ columns: ["id"], rows: [[1]], total_estimate: 1000 }) };
+  const api = { getRows: async () => ({ columns: ["id"], rows: [[1]] as unknown[][], total_estimate: 1000 }) };
   render(<TablePanel api={api} />);
   const items = await screen.findAllByRole("listitem");
   const id = items.find((li) => li.textContent?.startsWith("id "))!;
@@ -45,7 +45,7 @@ test("table_panel_shows_pk_fk_badges", async () => {
 test("rows_paged_50", async () => {
   useStore.setState({ graph, panelTable: "public.users" });
   const calls: number[][] = [];
-  const api = { getRows: async (_t: string, limit: number, offset: number) => (calls.push([limit, offset]), { columns: ["id"], rows: Array.from({ length: 50 }, (_, i) => [offset + i]), total_estimate: 1000 }) };
+  const api = { getRows: async (_t: string, limit = 50, offset = 0) => (calls.push([limit, offset]), { columns: ["id"], rows: Array.from({ length: 50 }, (_, i) => [offset + i]) as unknown[][], total_estimate: 1000 }) };
   render(<TablePanel api={api} />);
   await waitFor(() => expect(calls).toEqual([[50, 0]]));
   fireEvent.click(await screen.findByText("Next"));

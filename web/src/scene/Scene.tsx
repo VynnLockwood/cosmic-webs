@@ -43,6 +43,7 @@ function Probe() {
       return dotRadius(t.row_estimate, t.columns.length) * DOT_SCALE;
     };
     hook.state = () => { const { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled } = useStore.getState(); return { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled }; };
+    hook.lastRequest = () => useStore.getState().searchRequest;
     hook.orbitTo = (deg) => void cam.controls?.rotateAzimuthTo((deg * Math.PI) / 180, false);
   }, [graph, camera, size]);
   useFrame((_, dt) => {

@@ -9,6 +9,7 @@ import psycopg
 
 from .ddl import DdlError, parse_ddl
 from .sandbox import rebuild_sandbox
+from .sources import registry
 
 router = APIRouter(prefix="/api")
 SAMPLES = Path(os.environ.get("SAMPLES_DIR", Path(__file__).resolve().parents[2] / "samples"))
@@ -30,6 +31,8 @@ def _load(ddl: str) -> dict:
     if os.environ.get("SANDBOX_DSN"):
         try:
             r.graph = rebuild_sandbox(ddl, r.graph)
+            registry.use_sandbox()
+            registry.graph = r.graph
         except psycopg.Error as e:
             r.warnings.append(f"sandbox unavailable: {e}")
     return r.model_dump(by_alias=True)

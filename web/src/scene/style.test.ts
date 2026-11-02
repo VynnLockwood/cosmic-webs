@@ -39,3 +39,20 @@ test("clusterColor groups linked tables", () => {
   expect(clusterColor(g, 0)).toBe(clusterColor(g, 1));
   expect(clusterColor(g, 2)).not.toBe(clusterColor(g, 0));
 });
+
+import { pulseBoost, pulseCycle, pulsePeriod, PULSE_FRACTION } from "./style";
+
+test("link pulse travels child → parent every 3–8 s", () => {
+  for (let i = 0; i < 200; i++) {
+    expect(pulsePeriod(i)).toBeGreaterThanOrEqual(3);
+    expect(pulsePeriod(i)).toBeLessThanOrEqual(8);
+    expect(pulseCycle(i, 12.3)).toBeGreaterThanOrEqual(0);
+    expect(pulseCycle(i, 12.3)).toBeLessThan(1);
+    expect(pulseCycle(i, 5)).toBeCloseTo(pulseCycle(i, 5 + pulsePeriod(i)), 6);
+  }
+  expect(pulseBoost(8, 16, PULSE_FRACTION)).toBe(0); // idle part of the cycle
+  expect(pulseBoost(8, 16, 0.5)).toBe(0);
+  const mid = pulseBoost(8, 16, PULSE_FRACTION / 2); // pulse is halfway along the link
+  expect(mid).toBeGreaterThan(pulseBoost(2, 16, PULSE_FRACTION / 2));
+  expect(mid).toBeGreaterThan(1);
+});

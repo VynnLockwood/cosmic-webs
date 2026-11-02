@@ -58,3 +58,19 @@ export function linkStyle(s: LinkState): { opacity: number; dashed: boolean; col
     default: return { opacity: 0.25, dashed: false, color: COLORS.thread };
   }
 }
+
+/** Share of each pulse cycle during which the light is travelling along the link (the rest is idle). */
+export const PULSE_FRACTION = 0.3;
+/** Each link pulses every 3–8 s (deterministic per link). */
+export const pulsePeriod = (link: number) => 3 + ((link * 37) % 51) / 10;
+/** Position in the pulse cycle, [0,1). */
+export function pulseCycle(link: number, tSec: number): number {
+  const p = pulsePeriod(link);
+  return (((tSec + link * 1.3) % p) + p) % p / p;
+}
+/** Extra brightness (0…1.4) of sub-segment `slot` of `slots` while a pulse passes (slot 0 = child end). */
+export function pulseBoost(slot: number, slots: number, cycle: number): number {
+  if (cycle >= PULSE_FRACTION) return 0;
+  const pos = (cycle / PULSE_FRACTION) * slots;
+  return Math.max(0, 1 - Math.abs(slot + 0.5 - pos) / 2.5) * 1.4;
+}

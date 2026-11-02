@@ -3,7 +3,8 @@ import { useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color } from "three";
 import { useStore } from "../store/useStore";
 import { motion } from "./camera/motion";
-import { DOT_SCALE, dotRadius, linkStyle, type LinkState } from "./style";
+import { E2E } from "./e2eHook";
+import { DOT_SCALE, dotRadius, linkStyle, pulseBoost, pulseCycle, type LinkState } from "./style";
 
 const LOOP = 12;
 const SLOTS = 16; // a link is drawn as 16 sub-segments so it can be dashed
@@ -27,21 +28,24 @@ export function Links() {
   }, [segCount]);
   const c = useMemo(() => new Color(), []);
 
-  useFrame(() => {
-    const { positions, hoveredTable, selectedTable, linkOverrides } = useStore.getState();
+  useFrame(({ clock }) => {
+    const { positions, hoveredTable, selectedTable, linkOverrides, reducedMotion } = useStore.getState();
+    const pulses = !E2E && !reducedMotion;
     if (positions.length !== graph.tables.length * 3) return;
     const pos = geo.getAttribute("position") as BufferAttribute;
     const col = geo.getAttribute("color") as BufferAttribute;
     const focus = [hoveredTable, selectedTable].filter(Boolean) as string[];
     let v = 0;
+    let li = -1;
     for (const l of links) {
+      li++;
       const names = [graph.tables[l.a].name, graph.tables[l.b].name];
       const state: LinkState = linkOverrides[l.id] ?? (focus.some((f) => names.includes(f)) ? "neighbor" : "idle");
       const st = linkStyle(state);
       c.set(st.color).multiplyScalar(st.opacity * motion.linkFade);
       const k = motion.bang;
       const pa = [positions[l.a * 3] * k, positions[l.a * 3 + 1] * k, positions[l.a * 3 + 2] * k];
-      const put = (p: number[]) => { pos.setXYZ(v, p[0], p[1], p[2]); col.setXYZ(v, c.r, c.g, c.b); v++; };
+      const put = (p: number[], boost = 0) => { pos.setXYZ(v, p[0], p[1], p[2]); col.setXYZ(v, c.r * (1 + 2.5 * boost), c.g * (1 + 2.5 * boost), c.b * (1 + 2.5 * boost)); v++; };
       if (l.a === l.b) {
         const r = dotRadius(graph.tables[l.a].row_estimate, graph.tables[l.a].columns.length) * DOT_SCALE * 1.6;
         for (let k = 0; k < LOOP; k++) {
@@ -53,10 +57,12 @@ export function Links() {
         const pb = [positions[l.b * 3] * k, positions[l.b * 3 + 1] * k, positions[l.b * 3 + 2] * k];
         const at = (u: number) => [pa[0] + (pb[0] - pa[0]) * u, pa[1] + (pb[1] - pa[1]) * u, pa[2] + (pb[2] - pa[2]) * u];
         for (let j = 0; j < SLOTS; j++) {
-          // solid: slot 0 spans the link, others collapse; dashed: even slots drawn, odd collapse
-          const [u0, u1] = st.dashed ? (j % 2 === 0 ? [j / SLOTS, (j + 1) / SLOTS] : [0, 0]) : j === 0 ? [0, 1] : [0, 0];
-          put(at(u0));
-          put(at(u1));
+          // 16 sub-segments from child (u=0) to parent (u=1) so a light pulse can travel along the link; dashed links skip odd ones
+          const drawn = !st.dashed || j % 2 === 0;
+          const boost = pulses && drawn ? pulseBoost(j, SLOTS, pulseCycle(li, clock.elapsedTime)) : 0;
+          const [u0, u1] = drawn ? [j / SLOTS, (j + 1) / SLOTS] : [0, 0];
+          put(at(u0), boost);
+          put(at(u1), boost);
         }
       }
     }

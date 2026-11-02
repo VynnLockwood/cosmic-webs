@@ -4,5 +4,6 @@ pub mod graph;
 pub mod layout;
 pub mod paths;
 pub mod search;
+pub mod sqlgen;
 pub mod types;
 pub mod wasm;

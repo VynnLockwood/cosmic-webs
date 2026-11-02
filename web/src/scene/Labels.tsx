@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
 import type { Group } from "three";
 import { useStore } from "../store/useStore";
+import { motion } from "./camera/motion";
 
 const NEAREST = 12;
 
@@ -13,7 +14,7 @@ function Label({ index, name, strong }: { index: number; name: string; strong: b
   useFrame(() => {
     const p = useStore.getState().positions;
     if (p.length < (index + 1) * 3) return;
-    group.current.position.set(p[index * 3], p[index * 3 + 1], p[index * 3 + 2]);
+    group.current.position.set(p[index * 3] * motion.bang, p[index * 3 + 1] * motion.bang, p[index * 3 + 2] * motion.bang);
     if (div.current) {
       const d = camera.position.distanceTo(group.current.position);
       div.current.style.opacity = String(strong ? 1 : Math.max(0, Math.min(0.75, 1 - (d - 80) / 260)));

@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color } from "three";
 import { useStore } from "../store/useStore";
+import { motion } from "./camera/motion";
 import { DOT_SCALE, dotRadius, linkStyle, type LinkState } from "./style";
 
 const LOOP = 12;
@@ -36,8 +37,9 @@ export function Links() {
       const names = [graph.tables[l.a].name, graph.tables[l.b].name];
       const state: LinkState = linkOverrides[l.id] ?? (focus.some((f) => names.includes(f)) ? "neighbor" : "idle");
       const st = linkStyle(state);
-      c.set(st.color).multiplyScalar(st.opacity);
-      const pa = [positions[l.a * 3], positions[l.a * 3 + 1], positions[l.a * 3 + 2]];
+      c.set(st.color).multiplyScalar(st.opacity * motion.linkFade);
+      const k = motion.bang;
+      const pa = [positions[l.a * 3] * k, positions[l.a * 3 + 1] * k, positions[l.a * 3 + 2] * k];
       const put = (p: number[]) => { pos.setXYZ(v, p[0], p[1], p[2]); col.setXYZ(v, c.r, c.g, c.b); v++; };
       if (l.a === l.b) {
         const r = dotRadius(graph.tables[l.a].row_estimate, graph.tables[l.a].columns.length) * DOT_SCALE * 1.6;
@@ -48,7 +50,7 @@ export function Links() {
         }
       } else {
         put(pa);
-        put([positions[l.b * 3], positions[l.b * 3 + 1], positions[l.b * 3 + 2]]);
+        put([positions[l.b * 3] * k, positions[l.b * 3 + 1] * k, positions[l.b * 3 + 2] * k]);
       }
     }
     pos.needsUpdate = col.needsUpdate = true;

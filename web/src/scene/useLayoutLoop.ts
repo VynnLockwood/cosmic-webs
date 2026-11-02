@@ -10,10 +10,14 @@ export function useLayoutLoop() {
     let stop = false;
     (async () => {
       const core = getCore();
+      useStore.getState().setLayoutSettled(false);
       await core.layoutNew(graph, 1);
       while (!stop) {
         useStore.getState().setPositions(await core.layoutStep(3));
-        if (await core.layoutSettled()) break;
+        if (await core.layoutSettled()) {
+          useStore.getState().setLayoutSettled(true);
+          break;
+        }
         await new Promise((r) => setTimeout(r, 16));
       }
     })().catch((e) => console.error("layout failed", e));

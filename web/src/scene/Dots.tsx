@@ -2,6 +2,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { AdditiveBlending, Color, DoubleSide, IcosahedronGeometry, InstancedMesh, Object3D, Sphere, Vector3 } from "three";
 import { useStore } from "../store/useStore";
+import { motion, motionActions } from "./camera/motion";
 import { E2E } from "./e2eHook";
 import { clusterColors, DOT_SCALE, dotRadius, dotStyle, type DotState } from "./style";
 
@@ -30,7 +31,7 @@ export function Dots() {
       const pulse = st.pulse && !E2E ? 1 + 0.07 * Math.sin(t * 1.3 + i * 1.7) : 1;
       const r = radii[i] * pulse;
       const o = tmp.o;
-      o.position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+      o.position.set(positions[i * 3] * motion.bang, positions[i * 3 + 1] * motion.bang, positions[i * 3 + 2] * motion.bang);
       o.quaternion.identity();
       o.scale.setScalar(r * 0.6);
       o.updateMatrix();
@@ -62,7 +63,7 @@ export function Dots() {
         args={[geo, undefined, n]}
         onPointerOver={(e) => (e.stopPropagation(), e.instanceId !== undefined && setHover(graph.tables[e.instanceId].name))}
         onPointerOut={() => setHover(null)}
-        onClick={(e) => (e.stopPropagation(), e.instanceId !== undefined && useStore.getState().selectTable(graph.tables[e.instanceId].name))}
+        onClick={(e) => (e.stopPropagation(), e.instanceId !== undefined && motionActions.flyToTable(graph.tables[e.instanceId].name))}
       >
         <meshBasicMaterial toneMapped={false} />
       </instancedMesh>

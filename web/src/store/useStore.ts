@@ -20,6 +20,11 @@ export interface State {
   /** per-table / per-fk visual overrides set by search, flags and fly-in */
   dotOverrides: Record<string, DotState>;
   linkOverrides: Record<string, LinkState>;
+  /** table whose detail panel is open (set when the fly-in arrives) */
+  panelTable: string | null;
+  setPanelTable(n: string | null): void;
+  layoutSettled: boolean;
+  setLayoutSettled(v: boolean): void;
   flyingIn: boolean;
   setFlyingIn(v: boolean): void;
   setOverrides(d: Record<string, DotState>, l: Record<string, LinkState>): void;
@@ -35,6 +40,12 @@ export interface State {
   setReducedMotion(v: boolean): void;
 }
 
+/** `?tier=low|medium|high` forces a quality tier (used by browser tests). */
+function initialTier(): TierSetting {
+  const t = typeof location !== "undefined" ? new URLSearchParams(location.search).get("tier") : null;
+  return t === "low" || t === "medium" || t === "high" ? t : "auto";
+}
+
 export const useStore = create<State>((set) => ({
   graph: null,
   positions: new Float32Array(0),
@@ -45,14 +56,18 @@ export const useStore = create<State>((set) => ({
   searchRequest: null,
   results: [],
   flags: [],
-  tier: "auto",
+  tier: initialTier(),
   dotOverrides: {},
   linkOverrides: {},
+  layoutSettled: false,
+  setLayoutSettled: (layoutSettled) => set({ layoutSettled }),
+  panelTable: null,
+  setPanelTable: (panelTable) => set({ panelTable }),
   flyingIn: false,
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, results: [], flags: [], searchRequest: null, dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], flags: [], searchRequest: null, dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

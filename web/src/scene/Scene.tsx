@@ -8,6 +8,7 @@ import { Dots } from "./Dots";
 import { hook, perf, SKY_ONLY } from "./e2eHook";
 import { Labels } from "./Labels";
 import { Links } from "./Links";
+import { Space } from "./space/Space";
 import { COLORS } from "./style";
 import { useLayoutLoop } from "./useLayoutLoop";
 
@@ -30,20 +31,24 @@ function Probe() {
   return null;
 }
 
-export default function Scene() {
-  useLayoutLoop();
-  const graph = useStore((s) => s.graph);
-  const controls = useRef<Controls>(null);
+function Rig() {
+  const ref = useRef<Controls>(null);
   useEffect(() => {
-    cam.controls = controls.current;
+    cam.controls = ref.current;
     return () => {
       cam.controls = null;
     };
-  });
+  }, []);
+  return <CameraControls ref={ref} makeDefault dampingFactor={0.08} />;
+}
+
+export default function Scene() {
+  useLayoutLoop();
+  const graph = useStore((s) => s.graph);
   return (
     <Canvas camera={{ position: [0, 40, 220], fov: 55, near: 0.1, far: 12000 }} dpr={[1, 2]} onPointerMissed={() => useStore.getState().selectTable(null)}>
       <color attach="background" args={[COLORS.void]} />
-      <CameraControls ref={controls} makeDefault dampingFactor={0.08} />
+      <Rig />
       {graph && !SKY_ONLY && (
         <>
           <Links />
@@ -51,6 +56,7 @@ export default function Scene() {
           <Labels />
         </>
       )}
+      <Space />
       <Probe />
     </Canvas>
   );

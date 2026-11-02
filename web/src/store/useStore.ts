@@ -20,6 +20,8 @@ export interface State {
   /** per-table / per-fk visual overrides set by search, flags and fly-in */
   dotOverrides: Record<string, DotState>;
   linkOverrides: Record<string, LinkState>;
+  flyingIn: boolean;
+  setFlyingIn(v: boolean): void;
   setOverrides(d: Record<string, DotState>, l: Record<string, LinkState>): void;
   setGraph(g: SchemaGraph): void;
   setPositions(p: Float32Array): void;
@@ -46,6 +48,8 @@ export const useStore = create<State>((set) => ({
   tier: "auto",
   dotOverrides: {},
   linkOverrides: {},
+  flyingIn: false,
+  setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
   setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, results: [], flags: [], searchRequest: null, dotOverrides: {}, linkOverrides: {} }),

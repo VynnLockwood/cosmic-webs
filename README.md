@@ -1,1 +1,54 @@
-# cosmic-webs
+# Cosmic Webs
+
+Look at a Postgres schema as a **cosmic web**: every table is a glowing dot, every foreign key a thread between
+dots, floating in deep space you can orbit and fly through. Pick columns and conditions from anywhere in the
+schema and Cosmic Webs finds the **top 5 ranked SQL plans** that fetch them — and flags what can't be reached, and why.
+
+## Run it
+
+```bash
+docker compose up --build      # http://localhost
+```
+
+Services: `nginx` (reverse proxy) → `web` (Vite + React + TypeScript, Rust math compiled to WASM) and `api` (FastAPI),
+plus `sandbox-pg` (Postgres 16 with generated mock data). The default 25-table shop schema loads on start.
+
+- **Schema** (left rail): upload a `.sql` file or paste DDL → every table becomes a dot, every FK a link.
+- **Data source**: *Sandbox* (mock data, default) or *Live Postgres* (read-only, 5 s statement timeout, password kept only in API memory).
+- **Click a dot**: the camera flies in; the panel shows columns (PK/FK) and paged rows. `Esc` flies back.
+- **Search**: pick columns (multi-select over the whole schema) and AND/OR conditions (`= != < <= > >= IN NOT IN LIKE ILIKE IS NULL IS NOT NULL BETWEEN`).
+  The Rust core finds join paths (Steiner trees over the FK graph), builds up to 20 candidate queries (join / EXISTS / split),
+  the API runs `EXPLAIN` on each, and the best 5 are shown with SQL, joins, queries and cost.
+  Unreachable tables, ambiguous FKs, type mismatches, timeouts and permission errors are flagged.
+
+Keys: drag = rotate · right-drag = pan · wheel = zoom · `/` search · `Esc` back · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
+
+## Layout
+
+| Path | What |
+|---|---|
+| `core/` | Rust crate `cosmos-core`: force layout, join paths, SQL generation, diagnosis, ranking (WASM via `wasm-pack`) |
+| `api/` | FastAPI: DDL parsing (`pglast`), sandbox + mock data, live source, rows, `EXPLAIN`/run |
+| `web/` | Vite + React + TS + react-three-fiber: scene, camera motion, UI, search |
+| `samples/` | `shop.sql` (default schema), fixtures, 500-table synthetic schema |
+| `docs/superpowers/` | design spec, visual design spec, implementation plan |
+
+## Develop
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up    # api reload + Vite HMR behind nginx
+core/build-wasm.sh                                                   # build the Rust core to web/src/wasm
+cd web && npm test && npm run e2e                                    # unit + browser tests
+cd api && pytest                                                     # needs Postgres 16 server binaries (starts a throwaway cluster)
+cd core && cargo test --release
+```
+
+### Testing notes
+
+- `web/src/wasm-stub` is a small JS stand-in for the WASM package. Unit tests and `VITE_USE_STUB=1` builds use it, so the
+  UI can be developed and tested without wasm32 tooling. Real WASM is used by the Docker build and the `WASM_REAL=1` browser tests.
+- `api/tests/test_contract_rust.py` runs the real Rust planner/ranker (via `core/examples/cli.rs`) against the API and a real
+  Postgres, so the Rust ↔ Python JSON contract is checked without a browser.
+- Browser tests mock the API unless `E2E_REAL_API=1`. Visual baselines are recorded with the stub layout on Linux/SwiftShader.
+- Performance targets (500 tables ≥ 50 fps, layout < 3 s): the layout budget is a Rust test; the fps check runs with `PERF=1` on a machine with a GPU.
+- Set `CHROMIUM_PATH` to use a specific Chromium for Playwright.

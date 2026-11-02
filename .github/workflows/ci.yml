@@ -1,0 +1,67 @@
+name: ci
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: wasm32-unknown-unknown }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: core }
+      - run: cargo test --release
+        working-directory: core
+      - run: cargo install wasm-pack --locked
+      - name: wasm tests (node)
+        run: wasm-pack test --node
+        working-directory: core
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: dtolnay/rust-toolchain@stable # contract tests build the Rust CLI
+      - run: pip install -e "api[dev]"
+      - name: tests (they start a throwaway Postgres 16 from /usr/lib/postgresql)
+        run: python -m pytest -q
+        working-directory: api
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: web
+      - run: npx tsc --noEmit && npx vitest run
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: browser tests (JS layout stub, mocked API; visual baselines are recorded this way)
+        run: npx playwright test
+        working-directory: web
+
+  full-stack:
+    runs-on: ubuntu-latest
+    needs: [rust, api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up -d --build
+      - run: sleep 15 && scripts/smoke.sh
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npx playwright install --with-deps chromium
+        working-directory: web
+      - name: real WASM + real API + sandbox Postgres
+        run: npx playwright test search
+        working-directory: web
+        env: { E2E_BASE_URL: "http://localhost", WASM_REAL: "1", E2E_REAL_API: "1" }
+      - if: failure()
+        run: docker compose logs --no-color | tail -200

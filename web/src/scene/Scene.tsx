@@ -44,6 +44,7 @@ function Probe() {
     };
     hook.state = () => { const { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled } = useStore.getState(); return { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled }; };
     hook.lastRequest = () => useStore.getState().searchRequest;
+    hook.setStore = (patch: Record<string, unknown>) => useStore.setState(patch as never);
     hook.orbitTo = (deg) => void cam.controls?.rotateAzimuthTo((deg * Math.PI) / 180, false);
   }, [graph, camera, size]);
   useFrame((_, dt) => {

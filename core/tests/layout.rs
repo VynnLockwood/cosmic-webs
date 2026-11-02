@@ -99,3 +99,16 @@ fn settles_500_tables_under_3s() {
     assert!(t.elapsed().as_secs_f32() < 3.0, "took {:?}", t.elapsed());
     assert!(l.positions().iter().all(|v| v.is_finite()));
 }
+
+#[test]
+fn settles_synthetic500_fixture_under_3s() {
+    let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../samples/synthetic500.graph.json");
+    let g: SchemaGraph = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
+    assert_eq!(g.tables.len(), 500);
+    let mut l = Layout::new(&g, 1);
+    let t = std::time::Instant::now();
+    while !l.is_settled() {
+        l.step(10);
+    }
+    assert!(t.elapsed().as_secs_f32() < 3.0, "took {:?}", t.elapsed());
+}

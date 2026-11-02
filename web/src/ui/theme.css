@@ -1,6 +1,6 @@
 :root {
-  --void: #05060f; --ui-text: #e6e9ff; --ui-muted: #8a90b8; --active: #bfe4ff; --thread: #8fa8ff;
-  --red: #ff5c6c; --amber: #ffc15c; --glass: rgba(12, 14, 30, 0.55); --border: rgba(160, 180, 255, 0.14);
+  --void: #05060f; --ui-text: #e6e9ff; --ui-muted: #a3aad6; --active: #bfe4ff; --thread: #8fa8ff;
+  --red: #ff5c6c; --amber: #ffc15c; --glass: rgba(12, 14, 30, 0.64); --border: rgba(160, 180, 255, 0.14);
 }
 .ui-layer { position: fixed; inset: 0; pointer-events: none; z-index: 5; font: 13px/1.4 Inter, system-ui, sans-serif; color: var(--ui-text); }
 .glass { background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 12px; pointer-events: auto; }

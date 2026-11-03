@@ -11,11 +11,13 @@ test("builds_request", async ({ page }) => {
     await page.getByRole("checkbox", { name: col, exact: true }).check();
   }
   await page.getByRole("button", { name: "+ Condition" }).click();
-  await page.getByLabel("Condition column").selectOption("public.orders.status");
-  await page.getByLabel("Condition value").fill("0");
+  await page.getByRole("combobox", { name: "Condition column" }).fill("orders.status");
+  await page.getByRole("combobox", { name: "Condition column" }).press("Enter");
+  await page.getByRole("combobox", { name: "Condition value" }).fill("0");
   await page.getByRole("button", { name: "+ Condition" }).first().click();
-  await page.getByLabel("Condition column").nth(1).selectOption("public.users.name");
-  await page.getByLabel("Condition value").nth(1).fill("xxx");
+  await page.getByRole("combobox", { name: "Condition column" }).nth(1).fill("users.name");
+  await page.getByRole("combobox", { name: "Condition column" }).nth(1).press("Enter");
+  await page.getByRole("combobox", { name: "Condition value" }).nth(1).fill("xxx");
   await page.getByRole("button", { name: "Search", exact: true }).last().click();
   await expect.poll(() => page.evaluate(() => (window as any).__cosmos.lastRequest())).toEqual({
     select: ["public.users.email", "public.orders.total", "public.products.name"],
@@ -31,7 +33,7 @@ test("invalid_value_is_reported_not_sent", async ({ page }) => {
   await page.getByLabel("Filter columns").fill("orders.status");
   await page.getByRole("checkbox", { name: "public.orders.status", exact: true }).check();
   await page.getByRole("button", { name: "+ Condition" }).click();
-  await page.getByLabel("Condition value").fill("abc");
+  await page.getByRole("combobox", { name: "Condition value" }).fill("abc");
   await page.getByRole("button", { name: "Search", exact: true }).last().click();
   await expect(page.getByRole("alert")).toContainText("not a whole number");
   expect(await page.evaluate(() => (window as any).__cosmos.lastRequest())).toBeNull();

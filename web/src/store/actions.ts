@@ -3,7 +3,8 @@ import type { ImportData, LiveParams } from "../types";
 import { loadSuggestions } from "./structureActions";
 import { useStore } from "./useStore";
 
-interface Deps { api: Pick<Api, "getDefaultSchema" | "postSchema" | "connectLive" | "disconnectLive"> & Partial<Pick<Api, "getSuggestions">> }
+interface Deps { api: Pick<Api, "getDefaultSchema" | "postSchema" | "connectLive" | "disconnectLive"> & Partial<Pick<Api, "getSuggestions" | "startSchemaJob" | "getJob">> }
+interface JobOpts { pollMs?: number }
 const real: Deps = { api: realApi };
 
 function show(graph: Parameters<ReturnType<typeof useStore.getState>["setGraph"]>[0], warnings: string[], mode: "sandbox" | "live", data: ImportData | null = null) {
@@ -13,9 +14,45 @@ function show(graph: Parameters<ReturnType<typeof useStore.getState>["setGraph"]
   useStore.setState({ schemaError: null, liveError: null, warnings, importData: data, shimmerAt: performance.now() });
 }
 
-/** Parse + load a DDL script. On error the previous graph stays and `schemaError` is set. */
-export async function loadSchema(ddl: string, deps: Deps = real): Promise<void> {
+let running = false;
+
+/** Import in the background: the parsed graph appears at once, a progress bar follows, the loaded graph replaces it. */
+async function runJob(ddl: string | null, deps: Deps, opts: JobOpts): Promise<void> {
+  const { startSchemaJob, getJob } = deps.api;
+  if (!startSchemaJob || !getJob) throw new Error("jobs unavailable");
+  if (running) {
+    useStore.setState({ schemaError: { message: "an import is already running, wait for it to finish", line: 0, col: 0 } });
+    return;
+  }
+  running = true;
   try {
+    const first = await startSchemaJob(ddl, useStore.getState().useDumpData);
+    show(first.graph, first.warnings, "sandbox", null);
+    useStore.setState({ importProgress: { stage: "Starting", percent: 0, message: "" } });
+    for (;;) {
+      await new Promise((r) => setTimeout(r, opts.pollMs ?? 300));
+      const j = await getJob(first.job_id);
+      if (j.status === "running") {
+        useStore.setState({ importProgress: { stage: j.stage, percent: j.percent, message: j.message } });
+        continue;
+      }
+      if (j.status === "error" || !j.result) throw new Error(j.error ?? "import failed");
+      const st = useStore.getState();
+      st.replaceGraph(j.result.graph);
+      useStore.setState({ warnings: j.result.warnings, importData: j.result.data ?? null });
+      void loadSuggestions(deps);
+      return;
+    }
+  } finally {
+    running = false;
+    useStore.setState({ importProgress: null });
+  }
+}
+
+/** Parse + load a DDL script. On error the previous graph stays and `schemaError` is set. */
+export async function loadSchema(ddl: string, deps: Deps = real, opts: JobOpts = {}): Promise<void> {
+  try {
+    if (deps.api.startSchemaJob && deps.api.getJob) return await runJob(ddl, deps, opts);
     const r = await deps.api.postSchema(ddl, useStore.getState().useDumpData);
     show(r.graph, r.warnings, "sandbox", r.data ?? null);
     void loadSuggestions(deps);
@@ -24,8 +61,9 @@ export async function loadSchema(ddl: string, deps: Deps = real): Promise<void> 
   }
 }
 
-export async function resetSchema(deps: Deps = real): Promise<void> {
+export async function resetSchema(deps: Deps = real, opts: JobOpts = {}): Promise<void> {
   try {
+    if (deps.api.startSchemaJob && deps.api.getJob) return await runJob(null, deps, opts);
     const r = await deps.api.getDefaultSchema();
     show(r.graph, r.warnings, "sandbox", r.data ?? null);
     void loadSuggestions(deps);

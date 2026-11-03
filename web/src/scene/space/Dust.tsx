@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, ShaderMaterial } from "three";
 import { E2E } from "../e2eHook";
 
@@ -30,6 +30,7 @@ export function Dust({ count }: { count: number }) {
     const m = new ShaderMaterial({ vertexShader: vert, fragmentShader: frag, transparent: true, depthWrite: false, blending: AdditiveBlending, uniforms: { uTime: { value: 0 }, uPx: { value: 1 } } });
     return { geo: g, mat: m };
   }, [count]);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
   useFrame(({ clock }) => { mat.uniforms.uTime.value = E2E ? 0 : clock.elapsedTime; });
   if (count === 0) return null;
   return <points geometry={geo} material={mat} frustumCulled={false} />;

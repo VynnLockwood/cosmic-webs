@@ -15,6 +15,12 @@ router = APIRouter(prefix="/api")
 SAMPLES = Path(os.environ.get("SAMPLES_DIR", Path(__file__).resolve().parents[2] / "samples"))
 
 
+class JobIn(BaseModel):
+    ddl: str | None = None
+    use_default: bool = False
+    use_dump_data: bool = True
+
+
 class SchemaIn(BaseModel):
     ddl: str
     use_dump_data: bool = True  # load the rows of the file when it has any (otherwise generate mock rows)
@@ -68,3 +74,34 @@ def default_schema():
     if _default_cache is None:
         _default_cache = _load((SAMPLES / "shop.sql").read_text())
     return _default_cache
+
+
+@router.post("/schema/jobs")
+def start_job(body: JobIn):
+    from . import jobs
+
+    if body.use_default:
+        ddl = (SAMPLES / "shop.sql").read_text()
+    elif body.ddl is not None:
+        ddl = body.ddl
+    else:
+        return JSONResponse(status_code=422, content={"message": "send ddl or use_default", "line": None, "col": None})
+    try:
+        started = jobs.start(ddl, body.use_dump_data)
+    except DdlError as e:
+        return error_response(e)
+    if started is None:
+        return JSONResponse(status_code=409, content={"message": "an import is already running, wait for it to finish"})
+    invalidate_default()
+    job_id, parsed = started
+    return {"job_id": job_id, "graph": parsed.graph.model_dump(by_alias=True), "warnings": parsed.warnings}
+
+
+@router.get("/jobs/{job_id}")
+def get_job(job_id: str):
+    from . import jobs
+
+    j = jobs.get(job_id)
+    if j is None:
+        return JSONResponse(status_code=404, content={"message": "unknown job"})
+    return j

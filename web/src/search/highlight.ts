@@ -3,10 +3,11 @@ import type { Candidate, Fk, Flag, FkChoices, SchemaGraph, SearchRequest } from 
 
 /** Tables named by the selected columns and the conditions. */
 export function requiredTables(req: SearchRequest): string[] {
-  const cols = [...req.select];
+  const cols = [...req.select, ...(req.group_by ?? []), ...(req.aggregates ?? []).flatMap((a) => (a.col ? [a.col] : [])), ...(req.order_by ?? []).flatMap((o) => (o.col ? [o.col] : []))];
   const walk = (c: SearchRequest["where"]) => {
     if (!c) return;
-    if ("children" in c) c.children.forEach(walk);
+    if ("not" in c) walk(c.not);
+    else if ("children" in c) c.children.forEach(walk);
     else cols.push(c.col);
   };
   walk(req.where);

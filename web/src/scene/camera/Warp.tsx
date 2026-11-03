@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Vector3 } from "three";
 import { motion } from "./motion";
 
@@ -15,6 +15,7 @@ export function Warp() {
     g.setAttribute("position", new BufferAttribute(new Float32Array(N * 6), 3));
     return { geo: g, seeds: Array.from({ length: N }, () => [r() * Math.PI * 2, 20 + r() * 160, 30 + r() * 500]) };
   }, []);
+  useEffect(() => () => geo.dispose(), [geo]);
   const v = useMemo(() => ({ f: new Vector3(), r: new Vector3(), u: new Vector3(), p: new Vector3() }), []);
 
   useFrame(() => {

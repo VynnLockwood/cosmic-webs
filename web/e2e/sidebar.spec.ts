@@ -1,14 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { mockApi, open, shop, shopSql } from "./helpers";
+import { mockApi, mockImportJob, open, shop, shopSql } from "./helpers";
 
 const small = { tables: ["a", "b", "c"].map((n) => ({ name: `public.${n}`, columns: [], row_estimate: 0 })), fks: [] };
 const count = (page: any) => page.evaluate(() => (window as any).__cosmos.dotCount);
 
 test("upload_shop_sql_gives_25_dots", async ({ page }) => {
   await mockApi(page, small);
-  await page.route("**/api/schema", (r) => r.request().method() === "POST" ? r.fulfill({ json: { graph: shop, warnings: [] } }) : r.continue());
   await open(page, "e2e=1&tier=low");
   expect(await count(page)).toBe(3);
+  await mockImportJob(page, shop); // the upload below goes through the import job (the page already loaded the small default)
   await page.getByRole("button", { name: "Schema" }).click();
   await page.getByLabel("Upload schema file").setInputFiles({ name: "shop.sql", mimeType: "text/plain", buffer: Buffer.from(shopSql) });
   await page.waitForFunction(() => (window as any).__cosmos.dotCount === 25);
@@ -17,8 +17,8 @@ test("upload_shop_sql_gives_25_dots", async ({ page }) => {
 
 test("invalid_ddl_shows_error_dotcount_unchanged", async ({ page }) => {
   await mockApi(page, small);
-  await page.route("**/api/schema", (r) => r.request().method() === "POST" ? r.fulfill({ status: 422, json: { message: 'syntax error at or near "tabel"', line: 2, col: 8 } }) : r.continue());
   await open(page, "e2e=1&tier=low");
+  await page.route("**/api/schema/jobs", (r) => r.fulfill({ status: 422, json: { message: 'syntax error at or near "tabel"', line: 2, col: 8 } }));
   await page.getByRole("button", { name: "Schema" }).click();
   await page.getByLabel("DDL").fill("create table a(id int);\ncreate tabel b(id int);");
   await page.getByRole("button", { name: "Build web" }).click();

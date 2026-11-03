@@ -13,7 +13,9 @@ export function draftToCond(draft: Draft | null, typeOf: (col: string) => string
   const walk = (n: Draft): Cond | null => {
     if (isGroup(n)) {
       const kids = n.children.map(walk).filter((x): x is Cond => x !== null);
-      return kids.length ? { op: n.op, children: kids } : null;
+      if (!kids.length) return null;
+      const g: Cond = { op: n.op, children: kids };
+      return n.not ? { not: g } : g;
     }
     const t = typeOf(n.col);
     if (t === undefined) {

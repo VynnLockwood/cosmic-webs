@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Group, ShaderMaterial } from "three";
 import { E2E } from "../e2eHook";
 import type { Tier } from "./quality";
@@ -92,6 +92,7 @@ export function Stars({ tier }: { tier: Tier }) {
       { g: layer(c.mid, 3, inShell(500, 3500), [1.4, 3.4]), m: mat(false, dpr), follow: false },
     ];
   }, [tier, dpr]);
+  useEffect(() => () => parts.forEach((p) => { p.g.dispose(); p.m.dispose(); }), [parts]); // tier or pixel-ratio change rebuilds the stars
   useFrame(({ clock }) => {
     sky.current.position.copy(camera.position);
     for (const p of parts) p.m.uniforms.uTime.value = E2E ? 0 : clock.elapsedTime;

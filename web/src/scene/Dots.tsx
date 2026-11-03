@@ -1,5 +1,5 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AdditiveBlending, Color, DoubleSide, IcosahedronGeometry, InstancedMesh, Object3D, Sphere, Vector3 } from "three";
 import { useStore } from "../store/useStore";
 import { motion, motionActions } from "./camera/motion";
@@ -12,6 +12,7 @@ export function Dots() {
   const graph = useStore((s) => s.graph)!;
   const n = graph.tables.length;
   const geo = useMemo(() => new IcosahedronGeometry(1, 2), []);
+  useEffect(() => () => geo.dispose(), [geo]);
   const radii = useMemo(() => graph.tables.map((t) => dotRadius(t.row_estimate, t.columns.length) * DOT_SCALE), [graph]);
   const colors = useMemo(() => clusterColors(graph).map((c) => new Color(c)), [graph]);
   const core = useRef<InstancedMesh>(null!);

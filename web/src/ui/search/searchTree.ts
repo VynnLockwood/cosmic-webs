@@ -1,10 +1,10 @@
 import type { BoolOp, Cmp, Cond, FkChoices, SearchRequest } from "../../types";
 
 /** A boolean tree whose leaves are of type L (Cond for requests, draft leaves in the editor). */
-export type Node<L> = { op: BoolOp; children: Node<L>[] } | L;
+export type Node<L> = { op: BoolOp; children: Node<L>[]; not?: boolean } | L;
 export type Path = number[];
 
-export const isGroup = <L,>(n: Node<L>): n is { op: BoolOp; children: Node<L>[] } => typeof n === "object" && n !== null && "children" in n;
+export const isGroup = <L,>(n: Node<L>): n is { op: BoolOp; children: Node<L>[]; not?: boolean } => typeof n === "object" && n !== null && "children" in n;
 
 function update<L>(tree: Node<L>, path: Path, fn: (n: Node<L>) => Node<L>): Node<L> {
   if (path.length === 0) return fn(tree);
@@ -13,7 +13,7 @@ function update<L>(tree: Node<L>, path: Path, fn: (n: Node<L>) => Node<L>): Node
   return { ...tree, children: tree.children.map((c, k) => (k === i ? update(c, rest, fn) : c)) };
 }
 
-function asGroup<L>(n: Node<L>): { op: BoolOp; children: Node<L>[] } {
+function asGroup<L>(n: Node<L>): { op: BoolOp; children: Node<L>[]; not?: boolean } {
   return isGroup(n) ? n : { op: "AND", children: [n] };
 }
 
@@ -48,15 +48,24 @@ export function toggleOp<L>(tree: Node<L>, path: Path): Node<L> {
   return update(tree, path, (n) => (isGroup(n) ? { ...n, op: n.op === "AND" ? "OR" : "AND" } : n));
 }
 
+/** Negate / un-negate the group at `path` (NOT (...)). */
+export function toggleNot<L>(tree: Node<L>, path: Path): Node<L> {
+  return update(tree, path, (n) => (isGroup(n) ? { ...n, not: !n.not } : n));
+}
+
 function prune(c: Cond): Cond | null {
+  if ("not" in c) {
+    const inner = prune(c.not);
+    return inner ? { not: inner } : null;
+  }
   if (!isGroup(c)) return c;
   const kids = c.children.map(prune).filter((x): x is Cond => x !== null);
   return kids.length === 0 ? null : { ...c, children: kids };
 }
 
 /** The JSON the Rust core takes (spec §3.4); empty groups are dropped. */
-export function toRequest(select: string[], tree: Cond | null, fkChoices: FkChoices): SearchRequest {
-  return { select, where: tree ? prune(tree) : null, fk_choices: fkChoices };
+export function toRequest(select: string[], tree: Cond | null, fkChoices: FkChoices, extra: Partial<SearchRequest> = {}): SearchRequest {
+  return { select, where: tree ? prune(tree) : null, fk_choices: fkChoices, ...extra };
 }
 
 type Cls = "int" | "num" | "bool" | "text" | "uuid" | "json" | "other";
@@ -74,10 +83,10 @@ export function cmpOptionsFor(pgType: string): Cmp[] {
   const nul: Cmp[] = ["IS NULL", "IS NOT NULL"];
   switch (typeClass(pgType)) {
     case "bool": return ["=", "!=", ...nul];
-    case "text": return ["=", "!=", "<", "<=", ">", ">=", "LIKE", "ILIKE", "IN", "NOT IN", "BETWEEN", ...nul];
+    case "text": return ["=", "!=", "<", "<=", ">", ">=", "LIKE", "ILIKE", "NOT LIKE", "NOT ILIKE", "~", "~*", "IN", "NOT IN", "BETWEEN", "NOT BETWEEN", ...nul];
     case "uuid": case "other": return ["=", "!=", "IN", "NOT IN", ...nul];
     case "json": return ["=", "!=", ...nul];
-    default: return ["=", "!=", "<", "<=", ">", ">=", "IN", "NOT IN", "BETWEEN", ...nul];
+    default: return ["=", "!=", "<", "<=", ">", ">=", "IN", "NOT IN", "BETWEEN", "NOT BETWEEN", ...nul];
   }
 }
 
@@ -109,9 +118,9 @@ function one(cls: Cls, raw: string): { ok: true; value: unknown } | { ok: false;
 export function parseValue(pgType: string, cmp: Cmp, raw: string): Parsed {
   const cls = typeClass(pgType);
   if (cmp === "IS NULL" || cmp === "IS NOT NULL") return { ok: true };
-  if (cmp === "BETWEEN" || cmp === "IN" || cmp === "NOT IN") {
+  if (cmp === "BETWEEN" || cmp === "NOT BETWEEN" || cmp === "IN" || cmp === "NOT IN") {
     const parts = raw.split(",").map((s) => (cls === "text" || cls === "other" ? s.trim() : s));
-    if (cmp === "BETWEEN" && parts.length !== 2) return { ok: false, error: "BETWEEN needs two values: low,high" };
+    if ((cmp === "BETWEEN" || cmp === "NOT BETWEEN") && parts.length !== 2) return { ok: false, error: "BETWEEN needs two values: low,high" };
     if (parts.some((p) => p === "")) return { ok: false, error: "empty value in list" };
     const vals: unknown[] = [];
     for (const p of parts) {

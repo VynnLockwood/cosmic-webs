@@ -96,12 +96,14 @@ def _first_line(e: Exception) -> str:
     return (str(e).strip().splitlines() or [type(e).__name__])[0]
 
 
-def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1000, dsn: str | None = None, use_dump_data: bool = True) -> ImportReport:
+def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1000, dsn: str | None = None, use_dump_data: bool = True, progress=None) -> ImportReport:
     """Rebuild the sandbox. Statements or tables that fail are skipped and reported; the sandbox is always left readable.
 
     If the file carries rows (COPY blocks) they are loaded as they are and empty tables stay empty; otherwise mock rows are generated.
     """
     dsn = dsn or os.environ["SANDBOX_DSN"]
+    tick = progress or (lambda *a, **k: None)
+    tick("Resetting sandbox", 0.0)
     report = ImportReport(graph=graph)
     warnings = report.warnings
     with psycopg.connect(dsn, autocommit=True) as conn:
@@ -114,7 +116,9 @@ def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1
         ensure_ddl_role(conn)
         conn.execute(f"set role {DDL_ROLE}")
         try:
-            for stmt in runnable_statements(ddl):
+            stmts = runnable_statements(ddl)
+            for i, stmt in enumerate(stmts):
+                tick("Creating tables", i / max(len(stmts), 1), " ".join(stmt.split())[:60])
                 try:
                     conn.execute(stmt)
                 except psycopg.Error as e:
@@ -132,21 +136,27 @@ def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1
         try:
             if any(b.rows for b in blocks):
                 report.data_source = "dump"
-                for b in blocks:
-                    if not b.rows:
-                        continue
+                todo = [b for b in blocks if b.rows]
+                total = sum(b.rows for b in todo)
+                done = 0
+                for b in todo:
+                    tick("Loading rows", done / total, b.table)
+                    done += b.rows
                     q = sql.SQL("COPY {} ({}) FROM STDIN").format(ident(b.table), sql.SQL(", ").join(map(sql.Identifier, b.columns)))
                     try:
                         with conn.transaction(), conn.cursor() as cur, cur.copy(q) as cp:
                             cp.write(b.data)
                     except psycopg.Error as e:
                         warnings.append(f"{b.table}: its {b.rows} rows were not loaded ({_first_line(e)})")
+                tick("Loading rows", 1.0)
             else:
                 with conn.transaction():
-                    fill_mock(conn, built, rows_per_table, warnings=warnings)
+                    fill_mock(conn, built, rows_per_table, warnings=warnings, progress=tick)
+                tick("Loading rows", 1.0)
         except psycopg.Error as e:
             warnings.append(f"data not loaded: {_first_line(e)}")
         finally:
+            tick("Finishing", 0.0)
             conn.execute("set session_replication_role = origin")
             grant_reader(conn)  # always: otherwise the read-only role cannot see the tables ("permission denied")
             conn.execute("analyze")
@@ -158,4 +168,5 @@ def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1
     report.rows_loaded = sum(counts.values())
     report.tables_with_data = sum(1 for n in counts.values() if n > 0)
     report.tables_empty = len(counts) - report.tables_with_data
+    tick("Finishing", 1.0)
     return report

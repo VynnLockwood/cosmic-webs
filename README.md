@@ -35,6 +35,16 @@ plus `sandbox-pg` (Postgres 16 with generated mock data). The default 25-table s
 
 Keys: drag = rotate · right-drag = pan · wheel = zoom · `/` search · `Esc` back · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
 
+## What the search can do
+
+Pick columns, add conditions, and shape the result. The planner finds the join paths, writes the candidate SQL and ranks the best five.
+
+- **Conditions:** `AND` / `OR` groups, `NOT (…)` on any group, `= != < <= > >=`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `LIKE`, `ILIKE`, `NOT LIKE`, `NOT ILIKE`, `~`, `~*`, `IS NULL`, `IS NOT NULL`.
+- **Shape:** `DISTINCT`, `ORDER BY` (columns or aggregates, ASC/DESC), `LIMIT`, `OFFSET`, `GROUP BY`, aggregates (`COUNT`, `COUNT DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`) and `HAVING`. Combinations Postgres would reject are flagged as `INVALID_QUERY` before anything runs.
+- **Pickers:** every column box is a search box. A condition's value box lists the values the column really holds (most frequent first, with counts) and narrows as you type.
+- **Find a table:** press `Ctrl/⌘ K`, type part of a table or column name. Matching dots light up, `Enter` flies there.
+- **Importing:** a schema upload returns the parsed graph at once and loads rows in the background with a live progress bar (`POST /api/schema/jobs`, poll `GET /api/jobs/{id}`).
+
 ## Layout
 
 | Path | What |

@@ -17,7 +17,7 @@ import { useLayoutLoop } from "./useLayoutLoop";
 
 function Probe() {
   const graph = useStore((s) => s.graph);
-  const { camera, size } = useThree();
+  const { camera, size, gl } = useThree();
   useEffect(() => {
     hook.dotCount = graph?.tables.length ?? 0;
     hook.linkCount = graph?.fks.length ?? 0;
@@ -44,6 +44,7 @@ function Probe() {
     };
     hook.state = () => { const { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled } = useStore.getState(); return { selectedTable, panelTable, hoveredTable, flyingIn, layoutSettled }; };
     hook.lastRequest = () => useStore.getState().searchRequest;
+    hook.gpu = () => ({ ...gl.info.memory, programs: gl.info.programs?.length ?? 0 });
     hook.setStore = (patch: Record<string, unknown>) => useStore.setState(patch as never);
     hook.orbitTo = (deg) => void cam.controls?.rotateAzimuthTo((deg * Math.PI) / 180, false);
   }, [graph, camera, size]);

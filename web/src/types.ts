@@ -6,17 +6,37 @@ export interface Fk { id: string; from: FkEnd; to: FkEnd }
 export interface SchemaGraph { tables: Table[]; fks: Fk[] }
 /** What the sandbox now holds: the rows of the uploaded file, or generated mock rows. */
 export interface ImportData { source: "dump" | "mock"; rows_loaded: number; tables_with_data: number; tables_empty: number }
+export interface JobState { id: string; status: "running" | "done" | "error"; stage: string; message: string; percent: number; result?: ParseResult | null; error?: string | null }
+export interface ImportProgressInfo { stage: string; percent: number; message: string }
 export interface ParseResult { graph: SchemaGraph; warnings: string[]; data?: ImportData }
 
 export type BoolOp = "AND" | "OR";
-export type Cmp = "=" | "!=" | "<" | "<=" | ">" | ">=" | "IN" | "NOT IN" | "LIKE" | "ILIKE" | "IS NULL" | "IS NOT NULL" | "BETWEEN";
+export type Cmp = "=" | "!=" | "<" | "<=" | ">" | ">=" | "IN" | "NOT IN" | "LIKE" | "ILIKE" | "NOT LIKE" | "NOT ILIKE" | "~" | "~*" | "IS NULL" | "IS NOT NULL" | "BETWEEN" | "NOT BETWEEN";
 export type Cond =
   | { op: BoolOp; children: Cond[] }
+  | { not: Cond }
   | { col: string; cmp: Cmp; value?: unknown };
+export type AggFunc = "COUNT" | "COUNT_DISTINCT" | "SUM" | "AVG" | "MIN" | "MAX";
+/** `col` omitted = COUNT(*) */
+export interface Aggregate { func: AggFunc; col?: string; alias?: string }
+export interface Having { agg: number; cmp: Cmp; value?: unknown }
+/** sort by a column (`col`) or an aggregate (`agg`, index into `aggregates`) */
+export interface OrderBy { col?: string; agg?: number; dir?: "ASC" | "DESC" }
 export type FkChoices = Record<string, string>;
-export interface SearchRequest { select: string[]; where: Cond | null; fk_choices: FkChoices }
+export interface SearchRequest {
+  select: string[];
+  where: Cond | null;
+  fk_choices: FkChoices;
+  distinct?: boolean;
+  aggregates?: Aggregate[];
+  group_by?: string[];
+  having?: Having[];
+  order_by?: OrderBy[];
+  limit?: number;
+  offset?: number;
+}
 
-export type FlagCode = "UNREACHABLE" | "AMBIGUOUS_FK" | "TYPE_MISMATCH" | "UNKNOWN_COLUMN" | "PERMISSION" | "TIMEOUT" | "EMPTY_RESULT";
+export type FlagCode = "UNREACHABLE" | "AMBIGUOUS_FK" | "TYPE_MISMATCH" | "UNKNOWN_COLUMN" | "PERMISSION" | "TIMEOUT" | "EMPTY_RESULT" | "INVALID_QUERY";
 export interface Flag { code: FlagCode; table: string | null; column: string | null; message: string }
 
 export interface SqlQuery { sql: string; params: unknown[] }
@@ -39,6 +59,7 @@ export interface Ranked {
 }
 
 export interface LiveParams { host: string; port: number; dbname: string; user: string; password: string; schema?: string; allow_analyze?: boolean }
+export interface ColumnValues { values: { value: unknown; count: number }[]; truncated: boolean }
 export interface RowsPage { columns: string[]; rows: unknown[][]; total_estimate: number }
 export interface RunResult { columns: string[]; rows: unknown[][]; row_count: number; flags: Flag[] }
 export interface SchemaError { message: string; line: number; col: number }

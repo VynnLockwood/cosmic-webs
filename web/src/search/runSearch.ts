@@ -1,6 +1,7 @@
 import { api as realApi, type Api } from "../api/client";
 import { getCore } from "../core/coreClient";
 import type { CoreApi } from "../core/coreApi";
+import { sqlCandidates } from "../ai/applyAnswer";
 import { useStore } from "../store/useStore";
 import type { Candidate, ExplainCost, ExplainResult, Flag, FlagCode, Ranked, SchemaGraph, SearchRequest } from "../types";
 
@@ -12,7 +13,7 @@ export interface SearchOutcome {
   /** split plans left out because they return separate result sets */
   splitHidden: number;
 }
-export interface SearchOptions { measure: boolean; includeSplit: boolean }
+export interface SearchOptions { measure: boolean; includeSplit: boolean; /** ready-made candidates (the model's own SQL) ranked with the planner's */ extra?: Candidate[] }
 interface Deps { core: Pick<CoreApi, "diagnose" | "planCandidates" | "rank" | "rankFlags">; api: Pick<Api, "explain"> }
 
 const TOP_N = 5;
@@ -20,7 +21,7 @@ const TOP_N = 5;
 /** Measuring runs every plan for real, which is only allowed (and meaningful) on the sandbox. */
 export function defaultOptions(): SearchOptions {
   const s = useStore.getState();
-  return { measure: s.measureTime && s.sourceMode === "sandbox", includeSplit: s.includeSplit };
+  return { measure: s.measureTime && s.sourceMode === "sandbox", includeSplit: s.includeSplit, extra: sqlCandidates(s.aiSql) };
 }
 const key = (f: Flag) => `${f.code}|${f.table ?? ""}|${f.column ?? ""}|${f.message}`;
 
@@ -42,8 +43,9 @@ export async function runSearch(
   const g = graph ?? { tables: [], fks: [] };
   const flags: Flag[] = [...(await core.diagnose(g, req))];
   const all = await core.planCandidates(g, req);
-  const candidates = opts.includeSplit ? all : all.filter((c) => c.shape !== "Split");
-  const splitHidden = all.length - candidates.length;
+  const planned = opts.includeSplit ? all : all.filter((c) => c.shape !== "Split");
+  const candidates = [...planned, ...(opts.extra ?? [])];
+  const splitHidden = all.length - planned.length;
   let ranked: Ranked[] = [];
   const costs: SearchOutcome["costs"] = {};
   if (candidates.length) {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1040 488" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="architecture-title architecture-desc" id="architecture-root">
 <title id="architecture-title">Cosmic Webs architecture</title>
-<desc id="architecture-desc">The browser runs the React and three.js view and a Rust core compiled to WebAssembly in a worker. Requests go over HTTPS to nginx, which proxies them to the FastAPI service. FastAPI runs SQL against the sandbox Postgres and, optionally, a live Postgres, both through read-only roles.</desc>
+<desc id="architecture-desc">The browser runs the React and three.js view and a Rust core compiled to WebAssembly in a worker. Requests go over HTTPS to nginx, which proxies them to the FastAPI service. FastAPI runs SQL against the sandbox Postgres and, optionally, a live Postgres, both through read-only roles. For the optional Expected result feature the browser sends table and column names, never rows, straight to OpenRouter with their own key.</desc>
 <defs>
       <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
       #architecture-root { --color-paper: #f5f5f5; --color-ink: #2d3142; --color-muted: #4f5d75; --font-sans: 'Geist', system-ui, sans-serif; --font-serif: 'Instrument Serif', serif; --font-mono: 'Geist Mono', ui-monospace, monospace; }
@@ -25,6 +25,7 @@
 <line x1="304" y1="176" x2="376" y2="176" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#architecture-arrow-link)"/>
 <line x1="488" y1="176" x2="544" y2="176" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#architecture-arrow-link)"/>
 <line x1="696" y1="176" x2="816" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#architecture-arrow)"/>
+<path d="M 304,200 H 344 Q 352,200 352,208 V 308 Q 352,316 360,316 H 376" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#architecture-arrow)"/>
 <path d="M 620,212 V 308 Q 620,316 628,316 H 816" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#architecture-arrow)"/>
 <rect x="184" y="224" width="72" height="12" rx="2" fill="#f5f5f5"/>
 <text x="220.0" y="233" fill="#bf4520" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PLAN · RANK</text>
@@ -36,6 +37,8 @@
 <text x="756.0" y="165" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SQL · RO</text>
 <rect x="656" y="296" width="80" height="12" rx="2" fill="#f5f5f5"/>
 <text x="696.0" y="305" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SELECT · RO</text>
+<rect x="360" y="244" width="72" height="12" rx="2" fill="#f5f5f5"/>
+<text x="396.0" y="253" fill="#5a6580" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">NAMES ONLY</text>
 <rect x="48" y="140" width="256" height="72" rx="6" fill="#f5f5f5"/>
 <rect x="48" y="140" width="256" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
 <rect x="56" y="148" width="20" height="12" rx="2" fill="none" stroke="#2d3142" stroke-width="0.8" stroke-opacity="0.40"/>
@@ -60,6 +63,12 @@
 <text x="566.0" y="157" fill="#bf4520" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">API</text>
 <text x="620.0" y="180" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">FastAPI</text>
 <text x="620.0" y="196" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">import · explain · run</text>
+<rect x="376" y="280" width="112" height="72" rx="6" fill="#f5f5f5"/>
+<rect x="376" y="280" width="112" height="72" rx="6" fill="#4f5d75" stroke="#5a6580" stroke-width="1" stroke-dasharray="4,3" fill-opacity="0.10"/>
+<rect x="384" y="288" width="20" height="12" rx="2" fill="none" stroke="#5a6580" stroke-width="0.8" stroke-opacity="0.40"/>
+<text x="394.0" y="297" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AI</text>
+<text x="432.0" y="320" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">OpenRouter</text>
+<text x="432.0" y="336" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">your own key</text>
 <rect x="816" y="140" width="192" height="72" rx="6" fill="#f5f5f5"/>
 <rect x="816" y="140" width="192" height="72" rx="6" fill="#2d3142" stroke="#4f5d75" stroke-width="1" fill-opacity="0.05"/>
 <rect x="824" y="148" width="52" height="12" rx="2" fill="none" stroke="#4f5d75" stroke-width="0.8" stroke-opacity="0.50"/>
@@ -83,7 +92,7 @@
 <rect x="420" y="428" width="14" height="10" rx="2" fill="#2d3142" stroke="#2d3142" stroke-width="1" fill-opacity="0.03" stroke-opacity="0.30"/>
 <text x="440" y="436" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Gateway</text>
 <rect x="540" y="428" width="14" height="10" rx="2" fill="#4f5d75" stroke="#5a6580" stroke-width="1" stroke-dasharray="4,3" fill-opacity="0.10"/>
-<text x="560" y="436" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Your own database</text>
+<text x="560" y="436" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Your own service</text>
 <line x1="700" y1="432" x2="728" y2="432" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#architecture-arrow-link)"/>
 <text x="736" y="436" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">HTTP</text>
 <line x1="784" y1="432" x2="812" y2="432" stroke="#bf4520" stroke-width="1.4" marker-end="url(#architecture-arrow-accent)"/>

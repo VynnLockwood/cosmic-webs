@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { runSearch } from "../../search/runSearch";
+import { executeSearch } from "../../search/executeSearch";
 import { useStore } from "../../store/useStore";
 import { ColumnPicker, useColumns } from "./ColumnPicker";
 import { ConditionEditor } from "./ConditionEditor";
-import { draftToCond } from "./draft";
-import { toRequest } from "./searchTree";
+import { ExpectedResult } from "./ExpectedResult";
 import { JoinsEditor } from "./JoinsEditor";
 import { QueryShape } from "./QueryShape";
-import { shapeToRequest } from "./shape";
-import { joinErrors, withJoins } from "../../search/virtualJoins";
 import type { GetValues } from "./ValueInput";
 
 export function SearchPanel({ getValues }: { getValues?: GetValues } = {}) {
@@ -26,24 +23,13 @@ export function SearchPanel({ getValues }: { getValues?: GetValues } = {}) {
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
-  const canRun = select.length > 0 || shape.aggregates.length > 0 || shape.groupBy.length > 0;
+  const aiSql = useStore((s) => s.aiSql);
+  const canRun = select.length > 0 || shape.aggregates.length > 0 || shape.groupBy.length > 0 || aiSql.length > 0;
   const run = async () => {
-    const { cond, errors } = draftToCond(draft, (c) => cols.find((x) => x.full === c)?.type);
-    const sh = shapeToRequest(shape);
-    const graph = useStore.getState().graph ?? { tables: [], fks: [] };
-    const all = [...errors, ...sh.errors, ...joinErrors(graph, joins)];
-    setErrors(all);
-    if (all.length) return;
-    const s = useStore.getState();
-    const req = toRequest(select, cond, s.fkChoices, sh.fields);
-    s.setSearch(req);
     setBusy(true);
+    setErrors([]);
     try {
-      const out = await runSearch(req, withJoins(graph, joins));
-      s.setResults(out.ranked, out.flags, { candidates: out.candidates, costs: out.costs, splitHidden: out.splitHidden });
-      s.setDrawer("results");
-    } catch (e: any) {
-      setErrors([String(e?.message ?? e)]);
+      setErrors(await executeSearch());
     } finally {
       setBusy(false);
     }
@@ -52,6 +38,7 @@ export function SearchPanel({ getValues }: { getValues?: GetValues } = {}) {
   return (
     <>
       <h2>Search</h2>
+      <ExpectedResult />
       <h3>Columns to fetch</h3>
       <ColumnPicker />
       <h3>Conditions</h3>

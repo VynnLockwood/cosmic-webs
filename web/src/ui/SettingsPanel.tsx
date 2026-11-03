@@ -1,3 +1,4 @@
+import { MODEL_EXAMPLES } from "../ai/aiSettings";
 import { RANGES, type VisualSettings } from "../store/visualSettings";
 import { useStore, type TierSetting } from "../store/useStore";
 
@@ -14,6 +15,9 @@ export function SettingsPanel() {
   const visual = useStore((s) => s.visual);
   const setVisual = useStore((s) => s.setVisual);
   const resetVisual = useStore((s) => s.resetVisual);
+  const ai = useStore((s) => s.ai);
+  const setAi = useStore((s) => s.setAi);
+  const forgetAi = useStore((s) => s.forgetAi);
   const s = useStore.getState();
   return (
     <>
@@ -31,6 +35,22 @@ export function SettingsPanel() {
         </div>
       ))}
       <button className="btn ghost" onClick={resetVisual}>Reset look</button>
+      <h3>AI (OpenRouter)</h3>
+      <p style={{ margin: "0 0 6px", color: "var(--ui-muted)" }}>
+        Powers <b>Expected result</b> in Search. Your key and model are saved in this browser only (localStorage) and are sent only to openrouter.ai, never to this app's server.
+        The model sees table and column names and types, never rows.
+      </p>
+      <div style={{ margin: "6px 0" }}>
+        <label htmlFor="ai-key">OpenRouter API key</label>
+        <input id="ai-key" type="password" autoComplete="off" spellCheck={false} placeholder="sk-or-…" value={ai.apiKey} onChange={(e) => setAi({ apiKey: e.target.value })} />
+      </div>
+      <div style={{ margin: "6px 0" }}>
+        <label htmlFor="ai-model">Model</label>
+        <input id="ai-model" list="ai-models" autoComplete="off" spellCheck={false} placeholder="provider/model-name" value={ai.model} onChange={(e) => setAi({ model: e.target.value })} />
+        <datalist id="ai-models">{MODEL_EXAMPLES.map((m) => <option key={m} value={m} />)}</datalist>
+        <div style={{ color: "var(--ui-muted)", fontSize: 12 }}>Any model id from openrouter.ai/models. The examples are only suggestions.</div>
+      </div>
+      <button className="btn ghost" onClick={forgetAi} disabled={!ai.apiKey && !ai.model}>Remove key and model</button>
       <h3>Performance</h3>
       <div className="row">
         <label htmlFor="tier">Quality</label>

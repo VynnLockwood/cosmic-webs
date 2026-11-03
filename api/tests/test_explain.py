@@ -147,3 +147,37 @@ def test_run_says_when_more_rows_exist_than_were_returned(shop):
     assert all_["row_count"] == 3 and all_["truncated"] is False
     exact = c.post("/api/run", json={"query": {"sql": USERS + " WHERE id <= 5"}, "limit": 5}).json()
     assert exact["row_count"] == 5 and exact["truncated"] is False  # exactly the limit is not "more"
+
+
+READ_ONLY_SQL = {
+    "left join": 'SELECT u.id, o.id FROM public.users u LEFT JOIN public.orders o ON o.user_id = u.id',
+    "cte": "WITH big AS (SELECT user_id, count(*) n FROM public.orders GROUP BY user_id) SELECT u.email, big.n FROM public.users u JOIN big ON big.user_id = u.id",
+    "window": "SELECT id, row_number() OVER (PARTITION BY user_id ORDER BY id) FROM public.orders",
+    "union": "SELECT id FROM public.users UNION ALL SELECT id FROM public.orders",
+    "subquery + case": "SELECT id, CASE WHEN id > 5 THEN 'big' ELSE 'small' END FROM public.users WHERE id IN (SELECT user_id FROM public.orders)",
+    "distinct on": "SELECT DISTINCT ON (user_id) user_id, id FROM public.orders ORDER BY user_id, id DESC",
+}
+
+
+@pytest.mark.parametrize("name", list(READ_ONLY_SQL))
+def test_any_read_only_sql_can_be_explained_and_run(shop, name):
+    c, _ = shop
+    q = {"sql": READ_ONLY_SQL[name], "params": []}
+    ex = c.post("/api/explain", json={"candidates": [{"id": "a", "queries": [q]}]}).json()["results"][0]
+    assert ex["error"] is None and ex["total_cost"] > 0
+    run = c.post("/api/run", json={"query": q, "limit": 5})
+    assert run.status_code == 200 and run.json()["columns"]
+
+
+@pytest.mark.parametrize("sql", [
+    "DELETE FROM public.users",
+    "WITH d AS (DELETE FROM public.users RETURNING *) SELECT * FROM d",
+    "WITH i AS (INSERT INTO public.users(email,name) VALUES ('a','b') RETURNING *) SELECT * FROM i",
+    "SELECT pg_sleep(0); DROP TABLE public.users",
+])
+def test_anything_that_writes_is_refused_and_nothing_changes(shop, sql):
+    c, _ = shop
+    before = c.post("/api/run", json={"query": {"sql": "SELECT count(*) FROM public.users"}}).json()["rows"]
+    r = c.post("/api/run", json={"query": {"sql": sql, "params": []}})
+    assert r.status_code == 400
+    assert c.post("/api/run", json={"query": {"sql": "SELECT count(*) FROM public.users"}}).json()["rows"] == before

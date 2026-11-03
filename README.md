@@ -6,13 +6,14 @@ them, ranks them by real run time, and tells you what could not be reached and w
 
 - **3D view** you can orbit, fly into, and search by name (`Ctrl/⌘ K`).
 - **Search builder** with `AND`/`OR`/`NOT`, 18 comparators, `DISTINCT`, `ORDER BY`, `LIMIT`, `GROUP BY`, aggregates and `HAVING`.
+- **Expected result (AI)**: describe what you want to see in plain words; a model of your choice (OpenRouter) drafts the query structure and any SQL the builder cannot say. It sees names only, never rows.
 - **Ranking you can read**: every plan has a score sheet that shows why it is #1.
 - **Structure lab**: add an index or a link, see if the best plan got faster, export the result.
 - **Your data**: upload a `pg_dump` / pgAdmin export (rows included), or connect to a live Postgres read-only.
 
 ## Architecture
 
-![Cosmic Webs architecture: the browser holds the React and three.js view and a Rust core compiled to WebAssembly; requests go over HTTPS through nginx to a FastAPI service, which runs SQL on the sandbox Postgres and, optionally, your live Postgres through read-only roles.](docs/architecture.svg)
+![Cosmic Webs architecture: the browser (which can call OpenRouter with the person's own key, sending names only) holds the React and three.js view and a Rust core compiled to WebAssembly; requests go over HTTPS through nginx to a FastAPI service, which runs SQL on the sandbox Postgres and, optionally, your live Postgres through read-only roles.](docs/architecture.svg)
 
 The diagram source is [`docs/architecture.html`](docs/architecture.html) (open it for the web fonts).
 
@@ -24,6 +25,7 @@ The diagram source is [`docs/architecture.html`](docs/architecture.html) (open i
 | **FastAPI** (`api/`) | server | DDL parsing (`pglast`), import jobs, mock data, `EXPLAIN` and run, structure lab, export |
 | **Sandbox Postgres** | server | your dump (or generated rows) in a throwaway database |
 | **Your Postgres** | optional | connected read-only; never edited |
+| **OpenRouter** | optional, called by the browser | drafts queries for **Expected result**; gets table and column names only, with your own key |
 
 ### What happens when you press Search
 
@@ -52,10 +54,10 @@ The default 25-table shop schema loads on start with a live progress bar.
 | **Schema** | Upload a `.sql` file or paste DDL. The graph appears at once; rows load in the background with a progress bar. |
 | **Data source** | *Sandbox* (default) or *Live Postgres* (read-only, 5 s statement timeout, password kept only in API memory). |
 | **Click a star** | The camera flies in; the panel shows columns (PK/FK) and paged rows. `Esc` flies back. |
-| **Search** | Pick columns, add conditions, shape the result. Every column box is a search box; a value box lists the values the column really holds, with counts. |
-| **Results** | Top five plans. Switch **SQL** between *Hardcoded values* (paste into pgAdmin and it runs) and *Params ($1)* (for application code). |
+| **Search** | Describe the result in **Expected result** (AI), or pick columns, add conditions, joins and shape yourself. Every column box is a search box; a value box lists the values the column really holds, with counts. |
+| **Results** | Top five plans; **Run** shows up to 200 rows in a scrolling table and says when there are more. Switch **SQL** between *Hardcoded values* (paste into pgAdmin and it runs) and *Params ($1)* (for application code). |
 | **Structure lab** | Indexes, links, columns, data size, one raw DDL statement; *Before / after* table; **Export** (see below). |
-| **Settings** | Star size, star brightness, web line brightness, spin sensitivity (saved in this browser), quality, reduced motion. |
+| **Settings** | OpenRouter key and model, star size, star brightness, web line brightness, spin sensitivity (all saved in this browser), quality, reduced motion. |
 
 Keys: drag = rotate · right-drag = pan · wheel = zoom · `Ctrl/⌘ K` find a table · `/` search · `Esc` back or close · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
 Side panels can be dragged wider or narrower (double-click the handle to reset).
@@ -66,6 +68,26 @@ Side panels can be dragged wider or narrower (double-click the handle to reset).
 - **Shape:** `DISTINCT`, `ORDER BY` (columns or aggregates, ASC/DESC), `LIMIT`, `OFFSET`, `GROUP BY`, `COUNT`, `COUNT DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`, `HAVING`.
   Combinations Postgres would reject are flagged `INVALID_QUERY` before anything runs.
 - **Flags:** `UNREACHABLE`, `AMBIGUOUS_FK`, `TYPE_MISMATCH`, `UNKNOWN_COLUMN`, `INVALID_QUERY`, `PERMISSION`, `TIMEOUT`, `EMPTY_RESULT`.
+
+### Joins you declare
+
+Tables with no foreign key cannot be joined by the planner, and a query that mixes them pairs every row with every row (a 289-row table against another one can
+return 10,000+ rows). In **Search → Joins** pick two columns that hold the same values; the planner then joins on them for that search. Your database is not changed.
+The BEFORE block in Results has an **Add a join** button for exactly this case.
+
+### Expected result (AI)
+
+Write what you want to see, for example *"every customer's name with the total they paid, biggest first, top 20; include customers who never ordered"*.
+
+1. Set your **OpenRouter API key and model** in Settings. They are stored in this browser's localStorage and sent only to `openrouter.ai`.
+2. The browser sends the model **table and column names, types, keys and links** (when the schema is large, only the tables that look related to your words). **No rows, no values, no row counts.** The server and your database are not involved in this step.
+3. The model answers with a structured request (columns, conditions, joins, `GROUP BY`, aggregates, sort, limit), optional custom joins, and, for anything the builder cannot say, full SQL:
+   `LEFT`/`RIGHT`/`FULL JOIN`, subqueries, `WITH` (CTEs), window functions, `UNION`, `CASE`, `DISTINCT ON`, date and string functions.
+4. Every part is checked before it is used: unknown columns and operators are dropped and listed as warnings, and only a single `SELECT` / `WITH … SELECT` is kept.
+5. The builder is filled so you can read and change it. The model's own SQL is listed under **AI SQL** and is **ranked together with the planner's queries** (`EXPLAIN`, timing, score sheet, Run).
+
+Only reading is possible: the API accepts one `SELECT` per query, and the sandbox and live sessions run it through a read-only role in a read-only transaction,
+so `INSERT`, `UPDATE`, `DELETE`, DDL and data-changing `WITH` queries are refused.
 
 ### Import and suggested links
 
@@ -88,7 +110,7 @@ Change the sandbox live; the web updates in place, your search re-runs, and *Bef
 | `POST /api/schema` · `GET /api/schema/default` | import in one request (no progress) |
 | `GET/POST/DELETE /api/source…` | sandbox or live source |
 | `GET /api/tables/{t}/rows` · `…/columns/{c}/values` | paged rows; distinct values with counts for autocomplete |
-| `POST /api/explain` · `POST /api/run` | `EXPLAIN` (optionally timed) and run a candidate query |
+| `POST /api/explain` · `POST /api/run` | `EXPLAIN` (optionally timed) and run a candidate query (one read-only `SELECT`; `run` returns up to 1,000 rows and a `truncated` flag) |
 | `GET /api/relations/suggest` | suggested foreign keys, checked against rows |
 | `GET /api/structure` · `POST /api/structure/apply` · `POST /api/sandbox/refill` | structure lab |
 | `GET /api/structure/export?kind=schema\|full` | download the sandbox as `.sql` |
@@ -126,7 +148,7 @@ cd core && cargo test --release
 
 The sandbox login is a Postgres superuser only for building tables and filling data. User-supplied DDL runs as `cosmos_ddl` (not a superuser) and every
 user-supplied `SELECT` as the read-only `cosmos_ro`, so neither can read server files. Live connections are read-only with a statement timeout. SQL shown with
-hardcoded values is for copying only; plans always run with bind parameters.
+hardcoded values is for copying only; plans always run with bind parameters. The OpenRouter key never reaches this app's server: the browser calls OpenRouter directly.
 
 ### Editing the architecture diagram
 

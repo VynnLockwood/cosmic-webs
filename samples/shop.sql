@@ -1,0 +1,30 @@
+-- Cosmic Webs default mock schema: a small online shop (25 tables)
+CREATE TYPE order_status_label AS ENUM ('new', 'paid', 'shipped', 'cancelled');
+CREATE TYPE payment_method AS ENUM ('card', 'paypal', 'bank', 'cash');
+
+CREATE TABLE users (id serial PRIMARY KEY, email text NOT NULL, name text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), is_active bool NOT NULL DEFAULT true);
+CREATE TABLE addresses (id serial PRIMARY KEY, user_id int4 NOT NULL REFERENCES users(id), line1 text NOT NULL, city text NOT NULL, country text NOT NULL);
+CREATE TABLE categories (id serial PRIMARY KEY, name text NOT NULL);
+CREATE TABLE suppliers (id serial PRIMARY KEY, name text NOT NULL, contact_email text);
+CREATE TABLE products (id serial PRIMARY KEY, supplier_id int4 NOT NULL REFERENCES suppliers(id), name text NOT NULL, price numeric(10,2) NOT NULL, attrs jsonb);
+CREATE TABLE product_categories (product_id int4 NOT NULL REFERENCES products(id), category_id int4 NOT NULL REFERENCES categories(id), PRIMARY KEY (product_id, category_id));
+CREATE TABLE tags (id serial PRIMARY KEY, label text NOT NULL);
+CREATE TABLE product_tags (product_id int4 NOT NULL REFERENCES products(id), tag_id int4 NOT NULL REFERENCES tags(id), PRIMARY KEY (product_id, tag_id));
+CREATE TABLE warehouses (id serial PRIMARY KEY, name text NOT NULL, city text NOT NULL);
+CREATE TABLE inventory (product_id int4 NOT NULL REFERENCES products(id), warehouse_id int4 NOT NULL REFERENCES warehouses(id), quantity int4 NOT NULL, PRIMARY KEY (product_id, warehouse_id));
+CREATE TABLE orders (id serial PRIMARY KEY, user_id int4 NOT NULL REFERENCES users(id), billing_address_id int4 NOT NULL REFERENCES addresses(id), shipping_address_id int4 NOT NULL REFERENCES addresses(id), status int4 NOT NULL, label order_status_label NOT NULL, total numeric(10,2) NOT NULL, placed_at timestamptz NOT NULL);
+CREATE TABLE order_items (id serial PRIMARY KEY, order_id int4 NOT NULL REFERENCES orders(id), product_id int4 NOT NULL, warehouse_id int4 NOT NULL, qty int4 NOT NULL, unit_price numeric(10,2) NOT NULL, FOREIGN KEY (product_id, warehouse_id) REFERENCES inventory(product_id, warehouse_id));
+CREATE TABLE payments (id serial PRIMARY KEY, order_id int4 NOT NULL REFERENCES orders(id), method payment_method NOT NULL, amount numeric(10,2) NOT NULL, paid_at timestamptz);
+CREATE TABLE shipments (id serial PRIMARY KEY, order_id int4 NOT NULL REFERENCES orders(id), warehouse_id int4 NOT NULL REFERENCES warehouses(id), tracking uuid NOT NULL, shipped_at timestamptz);
+CREATE TABLE refunds (id serial PRIMARY KEY, payment_id int4 NOT NULL REFERENCES payments(id), amount numeric(10,2) NOT NULL, reason text);
+CREATE TABLE reviews (id serial PRIMARY KEY, user_id int4 NOT NULL REFERENCES users(id), product_id int4 NOT NULL REFERENCES products(id), rating int4 NOT NULL, body text);
+CREATE TABLE carts (id serial PRIMARY KEY, user_id int4 NOT NULL REFERENCES users(id), updated_at timestamptz NOT NULL);
+CREATE TABLE cart_items (id serial PRIMARY KEY, cart_id int4 NOT NULL REFERENCES carts(id), product_id int4 NOT NULL REFERENCES products(id), qty int4 NOT NULL);
+CREATE TABLE coupons (id serial PRIMARY KEY, code text NOT NULL, percent_off int4 NOT NULL);
+CREATE TABLE order_coupons (order_id int4 NOT NULL REFERENCES orders(id), coupon_id int4 NOT NULL REFERENCES coupons(id), PRIMARY KEY (order_id, coupon_id));
+CREATE TABLE wishlists (id serial PRIMARY KEY, user_id int4 NOT NULL REFERENCES users(id), product_id int4 NOT NULL REFERENCES products(id));
+CREATE TABLE departments (id serial PRIMARY KEY, name text NOT NULL, head_id int4);
+CREATE TABLE employees (id serial PRIMARY KEY, name text NOT NULL, department_id int4 REFERENCES departments(id), manager_id int4 REFERENCES employees(id));
+ALTER TABLE departments ADD CONSTRAINT fk_departments_head FOREIGN KEY (head_id) REFERENCES employees(id);
+CREATE TABLE invoices (id serial PRIMARY KEY, order_id int4 NOT NULL REFERENCES orders(id), issued_by int4 REFERENCES employees(id), issued_at timestamptz NOT NULL);
+CREATE TABLE audit_log (id serial PRIMARY KEY, user_id int4 REFERENCES users(id), action text NOT NULL, at timestamptz NOT NULL);

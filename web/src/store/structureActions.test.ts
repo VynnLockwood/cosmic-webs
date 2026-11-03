@@ -10,7 +10,7 @@ const best = (id: string, value: number, metric: "cost" | "time" = "cost"): Rank
 const cand = (id: string): Candidate => ({ id, shape: "Join", fk_ids: [], tables: [], queries: [{ sql: `select ${id}`, params: [] }], joins: 0, query_count: 1 });
 
 beforeEach(() => {
-  useStore.setState({ graph, searchRequest: null, results: [], candidates: [], flags: [], experiments: [], indexes: [], structureError: null, structureBusy: false });
+  useStore.setState({ graph, changeLog: [], searchRequest: null, results: [], candidates: [], flags: [], experiments: [], indexes: [], structureError: null, structureBusy: false });
 });
 
 function fakes(values: number[]) {
@@ -130,4 +130,14 @@ test("labels stay short when many links are added at once", () => {
   const ops = ["a", "b", "c", "d"].map((t) => ({ kind: "add_fk" as const, table: `public.${t}`, columns: ["p"], ref_table: "public.parent", ref_columns: ["id"] }));
   expect(labelFor(ops)).toBe("+ FK a(p) → parent(id) and 3 more");
   expect(labelFor(ops.slice(0, 2))).toContain(";");
+});
+
+test("every change and data refill is remembered for the changes script", async () => {
+  const f = fakes([10, 9, 8]);
+  await applyStructure([{ kind: "create_index", table: "public.orders", columns: ["a"] }], { api: f.api as any, search: f.search } as any);
+  await refillData(50_000, { api: f.api as any, search: f.search } as any);
+  expect(useStore.getState().changeLog).toEqual([
+    { label: "+ index orders(a)", sql: ["CREATE INDEX ix"] },
+    { label: "Data: 50,000 rows per table", sql: [] },
+  ]);
 });

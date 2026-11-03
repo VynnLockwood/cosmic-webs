@@ -15,6 +15,7 @@ test("adding a link updates the web without moving the camera", async ({ page })
   const before = await page.evaluate(() => (window as any).__cosmos.cameraPose());
   await page.getByRole("button", { name: "Structure" }).click();
   await expect(page.getByRole("heading", { name: "Structure lab" })).toBeVisible();
+  await page.getByText("Foreign keys", { exact: true }).click(); // the card is collapsed until opened
   await page.getByLabel("FK from table").selectOption("public.reviews");
   await page.getByLabel("FK from column").selectOption("rating");
   await page.getByLabel("FK to table").selectOption("public.orders");

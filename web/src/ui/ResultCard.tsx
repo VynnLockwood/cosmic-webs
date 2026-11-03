@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import type { Candidate, Ranked, RunResult } from "../types";
+import { sqlFor } from "../search/sqlText";
+import { useStore } from "../store/useStore";
 import { WhyThisRank } from "./RankExplainer";
 
 interface Props { rank: number; r: Ranked; cand: Candidate; cost?: number; first?: Ranked; next?: Ranked; onHover(id: string | null): void }
@@ -8,7 +10,8 @@ interface Props { rank: number; r: Ranked; cand: Candidate; cost?: number; first
 export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props) {
   const [runs, setRuns] = useState<RunResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const sql = cand.queries.map((q) => q.sql).join(";\n");
+  const mode = useStore((s) => s.sqlMode);
+  const sql = cand.queries.map((q) => sqlFor(q, mode)).join(";\n");
   const run = async () => {
     setErr(null);
     try {
@@ -34,7 +37,7 @@ export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props)
         <span className="badge">{cand.shape}</span>
       </div>
       <pre className="mono" style={{ whiteSpace: "pre-wrap", margin: "6px 0", color: "var(--ui-text)" }}>{sql}</pre>
-      {cand.queries.some((q) => q.params.length) && <div className="mono" style={{ color: "var(--ui-muted)" }}>params: {JSON.stringify(cand.queries.map((q) => q.params))}</div>}
+      {mode === "params" && cand.queries.some((q) => q.params.length) && <div className="mono" style={{ color: "var(--ui-muted)" }}>params: {JSON.stringify(cand.queries.map((q) => q.params))}</div>}
       <WhyThisRank r={r} position={rank} first={first} next={next} />
       {cand.shape === "Split" && <div className="warn">Split plan: returns separate result sets, not one joined table.</div>}
       <div className="row">

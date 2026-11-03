@@ -159,7 +159,7 @@ export function DirectorDriver() {
         cb?.();
       }
     } else if (!E2E && idleActive(s.lastInput, now, reduced()) && g) {
-      c.azimuthAngle += ((IDLE_DEG_PER_S * Math.PI) / 180) * dt;
+      c.azimuthAngle += ((IDLE_DEG_PER_S * useStore.getState().visual.spin * Math.PI) / 180) * dt;
     }
   });
   return null;

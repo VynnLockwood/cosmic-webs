@@ -10,10 +10,12 @@ const cand = { id: "c1", shape: "Join", fk_ids: [], tables: [], joins: 0, query_
 test("the asked query keeps the dropped parts (struck through) next to the query that ran", () => {
   render(<AskedVsRan req={req} flags={[flag]} top={cand} />);
   const before = screen.getByLabelText("Request as asked");
-  expect(before).toHaveTextContent("SELECT users.email, sppProject.name");
-  expect(before).toHaveTextContent("WHERE sppProject.id = 'abc'");
+  expect(before).toHaveTextContent('SELECT "users"."email", "sppProject"."name"');
+  expect(before).toHaveTextContent('FROM "public"."users", "public"."sppProject"');
+  expect(before).toHaveTextContent("cross-joined");
+  expect(before).toHaveTextContent(`WHERE "sppProject"."id" = 'abc'`);
   const struck = within(before).getAllByText((_, el) => el?.tagName === "DEL");
-  expect(struck.map((e) => e.textContent)).toEqual(["sppProject.name", "sppProject.id = 'abc'"]);
+  expect(struck.map((e) => e.textContent)).toEqual(['"sppProject"."name"', '"public"."sppProject"', `"sppProject"."id" = 'abc'`]);
   expect(screen.getByLabelText("Query that ran")).toHaveTextContent('SELECT "t0"."email" FROM "public"."users"');
 });
 

@@ -33,3 +33,16 @@ test("the existing quality and motion settings are still there", () => {
   expect(screen.getByLabelText("Quality")).toBeInTheDocument();
   expect(screen.getByLabelText("Reduce motion")).toBeInTheDocument();
 });
+
+test("OpenRouter key and model are saved in localStorage, the key box hides what you type, and they can be removed", () => {
+  useStore.setState({ ai: { apiKey: "", model: "" } });
+  render(<SettingsPanel />);
+  const key = screen.getByLabelText("OpenRouter API key") as HTMLInputElement;
+  expect(key.type).toBe("password");
+  fireEvent.change(key, { target: { value: "sk-or-abc" } });
+  fireEvent.change(screen.getByLabelText("Model"), { target: { value: "openai/gpt-4o-mini" } });
+  expect(JSON.parse(localStorage.getItem("cosmos.ai")!)).toEqual({ apiKey: "sk-or-abc", model: "openai/gpt-4o-mini" });
+  fireEvent.click(screen.getByRole("button", { name: "Remove key and model" }));
+  expect(localStorage.getItem("cosmos.ai")).toBeNull();
+  expect(useStore.getState().ai).toEqual({ apiKey: "", model: "" });
+});

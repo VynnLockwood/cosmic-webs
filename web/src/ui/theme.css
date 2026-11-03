@@ -76,3 +76,5 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 12px; } table.gr
 .steps { display: flex; gap: 6px; flex-wrap: wrap; list-style: none; padding: 0; margin: 6px 0 8px; counter-reset: s; }
 .steps li { counter-increment: s; font-size: 11px; color: var(--ui-muted); border: 1px solid var(--border); border-radius: 12px; padding: 1px 8px; }
 .steps li::before { content: counter(s) ". "; color: var(--active); }
+
+.grid.sticky-head thead th { position: sticky; top: 0; background: rgba(12, 14, 30, .97); z-index: 1; }

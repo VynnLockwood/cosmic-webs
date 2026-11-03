@@ -3,6 +3,9 @@ import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
 import type { ChangeEntry } from "./exportScripts";
 import { clearVisual, DEFAULT_VISUAL, loadVisual, normalizeVisual, saveVisual, type VisualSettings } from "./visualSettings";
+import { clearAi, loadAi, saveAi, type AiSettings } from "../ai/aiSettings";
+import type { AiSql } from "../ai/parseAnswer";
+import type { VJoin } from "../search/virtualJoins";
 import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
@@ -70,6 +73,16 @@ export interface State {
   searchDraft: Draft | null;
   /** DISTINCT / sort / limit / aggregates / group / having as typed */
   searchShape: ShapeDraft;
+  /** joins the user declared for the search (columns whose values match) */
+  searchJoins: VJoin[];
+  /** OpenRouter key and model (localStorage only) */
+  ai: AiSettings;
+  setAi(p: Partial<AiSettings>): void;
+  forgetAi(): void;
+  /** full SQL written by the model; ranked together with the planner's queries until cleared */
+  aiSql: AiSql[];
+  setAiSql(s: AiSql[]): void;
+  setSearchJoins(j: VJoin[]): void;
   setSearchShape(s: ShapeDraft): void;
   fkChoices: Record<string, string>;
   setSearchSelect(v: string[]): void;
@@ -170,6 +183,21 @@ export const useStore = create<State>((set) => ({
   searchSelect: [],
   searchDraft: null,
   searchShape: emptyShape(),
+  searchJoins: [],
+  ai: loadAi(),
+  setAi: (p) =>
+    set((s) => {
+      const ai = { ...s.ai, ...p };
+      saveAi(ai);
+      return { ai };
+    }),
+  forgetAi: () => {
+    clearAi();
+    set({ ai: { apiKey: "", model: "" } });
+  },
+  aiSql: [],
+  setAiSql: (aiSql) => set({ aiSql }),
+  setSearchJoins: (searchJoins) => set({ searchJoins }),
   setSearchShape: (searchShape) => set({ searchShape }),
   fkChoices: {},
   setSearchSelect: (searchSelect) => set({ searchSelect }),
@@ -207,7 +235,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, searchShape: emptyShape(), fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], changeLog: [], dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, searchShape: emptyShape(), searchJoins: [], aiSql: [], fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], changeLog: [], dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

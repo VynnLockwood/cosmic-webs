@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { loadSchema, resetSchema } from "../store/actions";
 import { useStore } from "../store/useStore";
+import { ImportProgress } from "./ImportProgress";
 
 export function SchemaPanel() {
   const [ddl, setDdl] = useState("");
@@ -11,6 +12,7 @@ export function SchemaPanel() {
   const setUseDump = useStore((s) => s.setUseDumpData);
   const suggestions = useStore((s) => s.suggestions);
   const setDrawer = useStore((s) => s.setDrawer);
+  const busy = useStore((s) => s.importProgress !== null);
   const file = useRef<HTMLInputElement>(null);
   const onFile = async (f?: File | null) => {
     if (!f) return;
@@ -30,9 +32,10 @@ export function SchemaPanel() {
         <span>Use the rows in the file when it has any <span style={{ color: "var(--ui-muted)" }}>(otherwise mock rows are generated)</span></span>
       </label>
       <div className="row">
-        <button className="btn" onClick={() => loadSchema(ddl)} disabled={!ddl.trim()}>Build web</button>
+        <button className="btn" onClick={() => loadSchema(ddl)} disabled={!ddl.trim() || busy}>Build web</button>
         <button className="btn ghost" onClick={() => resetSchema()}>Reset to default</button>
       </div>
+      <ImportProgress />
       {data && (
         <p role="status" style={{ margin: "8px 0", color: "var(--ui-muted)" }}>
           {data.source === "dump"

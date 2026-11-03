@@ -6,6 +6,8 @@ export interface Fk { id: string; from: FkEnd; to: FkEnd }
 export interface SchemaGraph { tables: Table[]; fks: Fk[] }
 /** What the sandbox now holds: the rows of the uploaded file, or generated mock rows. */
 export interface ImportData { source: "dump" | "mock"; rows_loaded: number; tables_with_data: number; tables_empty: number }
+export interface JobState { id: string; status: "running" | "done" | "error"; stage: string; message: string; percent: number; result?: ParseResult | null; error?: string | null }
+export interface ImportProgressInfo { stage: string; percent: number; message: string }
 export interface ParseResult { graph: SchemaGraph; warnings: string[]; data?: ImportData }
 
 export type BoolOp = "AND" | "OR";

@@ -5,6 +5,7 @@ import { motionActions } from "./scene/camera/motion";
 import Scene from "./scene/Scene";
 import { SKY_ONLY } from "./scene/e2eHook";
 import { Drawer } from "./ui/Drawer";
+import { ImportProgress } from "./ui/ImportProgress";
 import { Hud } from "./ui/Hud";
 import { Rail } from "./ui/Rail";
 import { TablePanel } from "./ui/TablePanel";
@@ -41,6 +42,7 @@ export default function App() {
           <Drawer />
           <TablePanel />
           <Hud />
+          <ImportProgress floating />
         </div>
       )}
       {error && <div style={{ position: "absolute", top: 16, left: 80, color: "#FF5C6C" }}>Could not load schema: {error}</div>}

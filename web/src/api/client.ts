@@ -1,4 +1,4 @@
-import type { SuggestionsResult, StructureOp, StructureResult, StructureState, ExplainResult, LiveParams, ParseResult, RowsPage, RunResult, SchemaError, SchemaGraph, Candidate, SqlQuery } from "../types";
+import type { SuggestionsResult, StructureOp, StructureResult, StructureState, ExplainResult, LiveParams, ParseResult, JobState, RowsPage, RunResult, SchemaError, SchemaGraph, Candidate, SqlQuery } from "../types";
 
 export class ApiError extends Error {
   constructor(public status: number, public body: any) {
@@ -20,6 +20,9 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 export const api = {
   getDefaultSchema: () => call<ParseResult>("GET", "/schema/default"),
   postSchema: (ddl: string, useDumpData = true) => call<ParseResult>("POST", "/schema", { ddl, use_dump_data: useDumpData }),
+  startSchemaJob: (ddl: string | null, useDumpData = true) =>
+    call<{ job_id: string; graph: SchemaGraph; warnings: string[] }>("POST", "/schema/jobs", ddl === null ? { use_default: true } : { ddl, use_dump_data: useDumpData }),
+  getJob: (id: string) => call<JobState>("GET", `/jobs/${id}`),
   connectLive: (p: LiveParams) => call<{ graph: SchemaGraph }>("POST", "/source/live", p),
   disconnectLive: () => call<{ mode: string }>("DELETE", "/source/live"),
   getRows: (table: string, limit = 50, offset = 0) => call<RowsPage>("GET", `/tables/${encodeURIComponent(table)}/rows?limit=${limit}&offset=${offset}`),

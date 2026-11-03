@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
-import type { Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
+import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
 export type TierSetting = "auto" | "high" | "medium" | "low";
@@ -53,6 +53,8 @@ export interface State {
   replaceGraph(g: SchemaGraph): void;
   patchStructure(p: Partial<Pick<State, "indexes" | "suggestions" | "suggestionsSource" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
   importData: ImportData | null;
+  /** set while a schema import runs in the background (null when idle) */
+  importProgress: ImportProgressInfo | null;
   /** use the rows of an uploaded dump when it has any (otherwise mock rows are generated) */
   useDumpData: boolean;
   setUseDumpData(v: boolean): void;
@@ -127,6 +129,7 @@ export const useStore = create<State>((set) => ({
     })),
   patchStructure: (p) => set(p),
   importData: null,
+  importProgress: null,
   useDumpData: true,
   setUseDumpData: (useDumpData) => set({ useDumpData }),
   schemaError: null,

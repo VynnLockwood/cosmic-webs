@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import { useSearchHighlight } from "./search/useHighlight";
 import { motionActions } from "./scene/camera/motion";
-import Scene from "./scene/Scene";
 import { SKY_ONLY } from "./scene/e2eHook";
+
+// three.js and the scene are the heavy part of the bundle: load them in parallel with the schema, not before the UI
+const Scene = lazy(() => import("./scene/Scene"));
 import { Drawer } from "./ui/Drawer";
 import { FindTable } from "./ui/FindTable";
 import { ImportProgress } from "./ui/ImportProgress";
@@ -16,6 +18,7 @@ import { useStore } from "./store/useStore";
 
 export default function App() {
   const [error, setError] = useState<string | null>(null);
+  const graph = useStore((s) => s.graph);
   useEffect(() => {
     api
       .getDefaultSchema()
@@ -37,7 +40,8 @@ export default function App() {
   useSearchHighlight();
   return (
     <div style={{ position: "fixed", inset: 0 }} onDoubleClick={() => !useStore.getState().hoveredTable && motionActions.resetView()}>
-      <Scene />
+      <Suspense fallback={null}><Scene /></Suspense>
+      {!graph && !error && <div className="boot" role="status">Loading the universe…</div>}
       {!SKY_ONLY && (
         <div className="ui-layer">
           <Rail />

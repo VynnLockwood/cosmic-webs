@@ -68,3 +68,14 @@ test("onType reports the text so a server can answer (and the list is not filter
   expect(screen.getAllByRole("option")).toHaveLength(1);
   await act(async () => {});
 });
+
+test("matches on the name come before matches that only hit a hidden keyword", () => {
+  const opts: ComboOption[] = [
+    { value: "public.orders", label: "orders", keywords: "shipping_address_id" },
+    { value: "public.shipments", label: "shipments", keywords: "tracking" },
+  ];
+  render(<Combobox ariaLabel="Column" value="" options={opts} onPick={() => {}} />);
+  fireEvent.focus(input());
+  fireEvent.change(input(), { target: { value: "ship" } });
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([expect.stringContaining("shipments"), expect.stringContaining("orders")]);
+});

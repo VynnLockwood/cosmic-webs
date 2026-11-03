@@ -12,9 +12,16 @@ export const shopSql = fs.readFileSync(path.resolve(here, "../../samples/shop.sq
 export async function mockApi(page: Page, graph: any = shop) {
   if (process.env.E2E_REAL_API) return;
   await page.route("**/api/schema/default", (r) => r.fulfill({ json: { graph, warnings: [] } }));
+  await page.route("**/api/tables/**/values**", (r) => r.fulfill({ json: { values: [], truncated: false } }));
 }
 
 export async function open(page: Page, qs = "e2e=1") {
   await page.goto(`/?${qs}`);
   await page.waitForFunction(() => (window as any).__cosmos?.dotCount > 0, null, { timeout: 30_000 });
+}
+
+/** A schema import job that is already done: POST returns the parsed graph, polling returns the finished one. */
+export async function mockImportJob(page: Page, graph: any) {
+  await page.route("**/api/schema/jobs", (r) => r.fulfill({ json: { job_id: "j1", graph, warnings: [] } }));
+  await page.route("**/api/jobs/j1", (r) => r.fulfill({ json: { id: "j1", status: "done", stage: "Done", percent: 100, message: "", result: { graph, warnings: [] } } }));
 }

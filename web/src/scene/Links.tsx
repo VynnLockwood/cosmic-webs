@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color } from "three";
 import { useStore } from "../store/useStore";
 import { motion } from "./camera/motion";
@@ -26,6 +26,7 @@ export function Links() {
     g.setAttribute("color", new BufferAttribute(new Float32Array(segCount * 6), 3));
     return g;
   }, [segCount]);
+  useEffect(() => () => geo.dispose(), [geo]); // a new graph builds a new geometry: free the old one on the GPU
   const c = useMemo(() => new Color(), []);
 
   useFrame(({ clock }) => {

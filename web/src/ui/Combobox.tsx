@@ -38,10 +38,13 @@ export function Combobox({ value, options, onPick, ariaLabel, placeholder, allow
   const shown = useMemo(() => {
     const words = norm(text ?? "").split(/\s+/).filter(Boolean);
     if (!filter || !words.length) return options;
-    return options.filter((o) => {
+    const hit = options.filter((o) => {
       const hay = norm(`${o.group ?? ""} ${o.label ?? o.value} ${o.value} ${o.hint ?? ""} ${o.keywords ?? ""}`);
       return words.every((w) => hay.includes(w));
     });
+    // names first: a table called "shipments" outranks one that merely has a shipping_* column
+    const byName = (o: ComboOption) => words.every((w) => norm(`${o.label ?? o.value} ${o.value}`).includes(w));
+    return [...hit.filter(byName), ...hit.filter((o) => !byName(o))];
   }, [options, text, filter]);
   const rows = shown.slice(0, maxShown);
   useEffect(() => setActive(0), [text]);

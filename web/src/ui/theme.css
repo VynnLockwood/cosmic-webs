@@ -50,3 +50,6 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 12px; } table.gr
 
 .find-table { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: min(340px, 60vw); padding: 6px 8px; z-index: 25; }
 .find-table input { width: 100%; }
+
+.boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ui-muted); letter-spacing: .08em; pointer-events: none; animation: boot-pulse 1.6s ease-in-out infinite; }
+@keyframes boot-pulse { 50% { opacity: .45; } }

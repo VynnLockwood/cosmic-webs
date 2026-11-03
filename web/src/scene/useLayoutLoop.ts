@@ -15,6 +15,13 @@ export function initialPositions(names: string[], prev: Map<string, [number, num
   return out;
 }
 
+/** Remember the latest positions of `names` and forget every other table, so the map cannot grow with each upload. */
+export function rememberPositions(mem: Map<string, [number, number, number]>, names: string[], pos: ArrayLike<number>): void {
+  const keep = new Set(names);
+  for (const k of [...mem.keys()]) if (!keep.has(k)) mem.delete(k);
+  names.forEach((n, i) => mem.set(n, [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]));
+}
+
 /** Steps the WASM force layout in the worker until it settles, publishing positions to the store. */
 export function useLayoutLoop() {
   const graph = useStore((s) => s.graph);
@@ -27,7 +34,8 @@ export function useLayoutLoop() {
       await core.layoutNew(graph, 1, initialPositions(graph.tables.map((t) => t.name), lastPositions));
       while (!stop) {
         const pos = await core.layoutStep(3);
-        graph.tables.forEach((t, i) => lastPositions.set(t.name, [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]));
+        if (stop) break; // a newer graph took over while this step ran: do not publish stale positions
+        rememberPositions(lastPositions, graph.tables.map((t) => t.name), pos);
         useStore.getState().setPositions(pos);
         if (await core.layoutSettled()) {
           useStore.getState().setLayoutSettled(true);

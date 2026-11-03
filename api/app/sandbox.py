@@ -6,7 +6,9 @@ from pglast import ast
 from pglast.enums import AlterTableType
 from pglast import parse_sql
 
-from .ddl import strip_psql
+from dataclasses import dataclass, field
+
+from .ddl import extract_copy_blocks, strip_psql
 from psycopg import sql
 
 from .mockdata import fill_mock, ident
@@ -76,14 +78,32 @@ def refill_sandbox(rows_per_table: int, dsn: str | None = None) -> SchemaGraph:
     return graph
 
 
+@dataclass
+class ImportReport:
+    graph: SchemaGraph
+    warnings: list[str] = field(default_factory=list)
+    data_source: str = "mock"  # "dump": the rows of the file; "mock": generated rows
+    rows_loaded: int = 0
+    tables_with_data: int = 0
+    tables_empty: int = 0
+
+
 def rebuild_sandbox(ddl: str, graph: SchemaGraph, rows_per_table: int = 1000, dsn: str | None = None) -> SchemaGraph:
-    return rebuild_sandbox_report(ddl, graph, rows_per_table, dsn)[0]
+    return rebuild_sandbox_report(ddl, graph, rows_per_table, dsn).graph
 
 
-def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1000, dsn: str | None = None) -> tuple[SchemaGraph, list[str]]:
-    """Rebuild the sandbox. Statements that fail are skipped and reported; the returned graph holds what really exists."""
+def _first_line(e: Exception) -> str:
+    return (str(e).strip().splitlines() or [type(e).__name__])[0]
+
+
+def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1000, dsn: str | None = None, use_dump_data: bool = True) -> ImportReport:
+    """Rebuild the sandbox. Statements or tables that fail are skipped and reported; the sandbox is always left readable.
+
+    If the file carries rows (COPY blocks) they are loaded as they are and empty tables stay empty; otherwise mock rows are generated.
+    """
     dsn = dsn or os.environ["SANDBOX_DSN"]
-    warnings: list[str] = []
+    report = ImportReport(graph=graph)
+    warnings = report.warnings
     with psycopg.connect(dsn, autocommit=True) as conn:
         for (schema,) in conn.execute("select nspname from pg_namespace where nspname !~ '^pg_' and nspname <> 'information_schema'").fetchall():
             if schema == "public":
@@ -99,7 +119,7 @@ def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1
                     conn.execute(stmt)
                 except psycopg.Error as e:
                     head = " ".join(stmt.split())[:70]
-                    warnings.append(f"skipped ({head}…): {str(e).strip().splitlines()[0]}")
+                    warnings.append(f"skipped ({head}…): {_first_line(e)}")
         finally:
             conn.execute("reset role")
         existing = {f"{s}.{t}" for s, t in conn.execute("select schemaname, tablename from pg_tables where schemaname !~ '^pg_' and schemaname <> 'information_schema'")}
@@ -107,13 +127,35 @@ def rebuild_sandbox_report(ddl: str, graph: SchemaGraph, rows_per_table: int = 1
             tables=[t for t in graph.tables if t.name in existing],
             fks=[f for f in graph.fks if f.from_.table in existing and f.to.table in existing],
         )
-        conn.execute("set session_replication_role = replica")
-        with conn.transaction():
-            counts = fill_mock(conn, built, rows_per_table)
-        conn.execute("set session_replication_role = origin")
-        grant_reader(conn)
-        conn.execute("analyze")
+        blocks = [b for b in extract_copy_blocks(ddl) if b.table in existing] if use_dump_data else []
+        conn.execute("set session_replication_role = replica")  # no FK checks while loading
+        try:
+            if any(b.rows for b in blocks):
+                report.data_source = "dump"
+                for b in blocks:
+                    if not b.rows:
+                        continue
+                    q = sql.SQL("COPY {} ({}) FROM STDIN").format(ident(b.table), sql.SQL(", ").join(map(sql.Identifier, b.columns)))
+                    try:
+                        with conn.transaction(), conn.cursor() as cur, cur.copy(q) as cp:
+                            cp.write(b.data)
+                    except psycopg.Error as e:
+                        warnings.append(f"{b.table}: its {b.rows} rows were not loaded ({_first_line(e)})")
+            else:
+                with conn.transaction():
+                    fill_mock(conn, built, rows_per_table, warnings=warnings)
+        except psycopg.Error as e:
+            warnings.append(f"data not loaded: {_first_line(e)}")
+        finally:
+            conn.execute("set session_replication_role = origin")
+            grant_reader(conn)  # always: otherwise the read-only role cannot see the tables ("permission denied")
+            conn.execute("analyze")
+        counts = {t.name: conn.execute(sql.SQL("select count(*) from {}").format(ident(t.name))).fetchone()[0] for t in built.tables}
     out = built.model_copy(deep=True)
     for t in out.tables:
         t.row_estimate = counts.get(t.name, 0)
-    return out, warnings
+    report.graph = out
+    report.rows_loaded = sum(counts.values())
+    report.tables_with_data = sum(1 for n in counts.values() if n > 0)
+    report.tables_empty = len(counts) - report.tables_with_data
+    return report

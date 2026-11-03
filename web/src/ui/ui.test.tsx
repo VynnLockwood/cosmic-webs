@@ -51,3 +51,35 @@ test("rows_paged_50", async () => {
   fireEvent.click(await screen.findByText("Next"));
   await waitFor(() => expect(calls[1]).toEqual([50, 50]));
 });
+
+import { SchemaPanel } from "./SchemaPanel";
+
+test("schema panel tells what was loaded from the file", () => {
+  useStore.setState({ importData: { source: "dump", rows_loaded: 3334, tables_with_data: 24, tables_empty: 24 } });
+  render(<SchemaPanel />);
+  expect(screen.getByRole("status")).toHaveTextContent("Loaded 3,334 rows from your file into 24 tables. 24 tables have no rows in the file and stay empty.");
+  act(() => useStore.setState({ importData: { source: "mock", rows_loaded: 1000, tables_with_data: 1, tables_empty: 0 } }));
+  expect(screen.getByRole("status")).toHaveTextContent("generated 1,000 mock rows");
+});
+
+test("the 'use rows in the file' choice is sent with the upload", async () => {
+  useStore.setState({ useDumpData: true });
+  render(<SchemaPanel />);
+  fireEvent.click(screen.getByLabelText(/Use the rows in the file/));
+  expect(useStore.getState().useDumpData).toBe(false);
+  const sent: unknown[] = [];
+  const api = { postSchema: async (ddl: string, use: boolean) => (sent.push([ddl, use]), { graph, warnings: [] }) } as any;
+  await act(() => loadSchema("create table a(id int);", { api }));
+  expect(sent).toEqual([["create table a(id int);", false]]);
+});
+
+test("the schema panel points to suggested links after a load", () => {
+  useStore.setState({ importData: null, suggestions: [
+    { id: "a", from_table: "public.a", from_columns: ["p"], to_table: "public.p", to_columns: ["id"], reason: "", checked: 3, matched: 3, verified: true },
+    { id: "b", from_table: "public.b", from_columns: ["p"], to_table: "public.p", to_columns: ["id"], reason: "", checked: null, matched: null, verified: false },
+  ] });
+  render(<SchemaPanel />);
+  expect(screen.getByText(/2 possible links the file does not declare \(1 confirmed by its rows\)/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Review in Structure lab" }));
+  expect(useStore.getState().drawer).toBe("structure");
+});

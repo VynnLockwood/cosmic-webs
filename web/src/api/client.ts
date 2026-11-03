@@ -1,4 +1,4 @@
-import type { StructureOp, StructureResult, StructureState, ExplainResult, LiveParams, ParseResult, RowsPage, RunResult, SchemaError, SchemaGraph, Candidate, SqlQuery } from "../types";
+import type { SuggestionsResult, StructureOp, StructureResult, StructureState, ExplainResult, LiveParams, ParseResult, RowsPage, RunResult, SchemaError, SchemaGraph, Candidate, SqlQuery } from "../types";
 
 export class ApiError extends Error {
   constructor(public status: number, public body: any) {
@@ -19,12 +19,13 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 
 export const api = {
   getDefaultSchema: () => call<ParseResult>("GET", "/schema/default"),
-  postSchema: (ddl: string) => call<ParseResult>("POST", "/schema", { ddl }),
+  postSchema: (ddl: string, useDumpData = true) => call<ParseResult>("POST", "/schema", { ddl, use_dump_data: useDumpData }),
   connectLive: (p: LiveParams) => call<{ graph: SchemaGraph }>("POST", "/source/live", p),
   disconnectLive: () => call<{ mode: string }>("DELETE", "/source/live"),
   getRows: (table: string, limit = 50, offset = 0) => call<RowsPage>("GET", `/tables/${encodeURIComponent(table)}/rows?limit=${limit}&offset=${offset}`),
   explain: (candidates: Candidate[], analyze = false, repeat = 3) =>
     call<{ results: ExplainResult[] }>("POST", "/explain", { candidates: candidates.map((c) => ({ id: c.id, queries: c.queries })), analyze, repeat }),
+  getSuggestions: () => call<SuggestionsResult>("GET", "/relations/suggest"),
   getStructure: () => call<StructureState>("GET", "/structure"),
   applyStructure: (ops: StructureOp[]) => call<StructureResult>("POST", "/structure/apply", { ops }),
   refill: (rows_per_table: number) => call<StructureState>("POST", "/sandbox/refill", { rows_per_table }),

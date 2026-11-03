@@ -27,7 +27,11 @@ plus `sandbox-pg` (Postgres 16 with generated mock data). The default 25-table s
   database it follows the planner's estimate. Split plans return separate result sets, so they are hidden unless you include them.
 - **Structure lab** (sandbox only): add or drop indexes, links (FKs) and columns, run one DDL statement, or change the data size
   (up to 100,000 rows per table). The web updates in place, your search re-runs, and a *Before / after* table shows how the best plan changed.
-- **Import**: pgAdmin / `pg_dump` exports work as they are (`\restrict` lines, `COPY` data, owners, sequences and grants are skipped).
+- **Import**: pgAdmin / `pg_dump` exports work as they are (`\restrict` lines, owners, sequences and grants are skipped). When the file contains rows
+  (`COPY` blocks) they are loaded as they are — empty tables stay empty; otherwise mock rows are generated. Tables or statements that fail are
+  skipped and reported, never leaving the sandbox half-built.
+- **Suggested links**: many databases declare few foreign keys. Columns named like another table (`sppProject`, `customer_id`) are suggested as links; with
+  real rows each suggestion shows how many of its values exist in the target key (`✓ 289/289 values match`), and one click declares it in the sandbox.
 
 Keys: drag = rotate · right-drag = pan · wheel = zoom · `/` search · `Esc` back · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
 

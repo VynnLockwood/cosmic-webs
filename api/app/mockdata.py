@@ -11,6 +11,17 @@ from psycopg.types.json import Jsonb
 from .models import Fk, SchemaGraph, Table
 
 INT_TYPES = {"int2", "int4", "int8"}
+TEXT_TYPES = {"text", "varchar", "bpchar", "citext"}
+FAKEABLE = INT_TYPES | TEXT_TYPES | {"bool", "numeric", "float4", "float8", "timestamptz", "timestamp", "date", "uuid", "jsonb", "json", "bytea"}
+
+
+def _b36(n: int) -> str:
+    digits, out = "0123456789abcdefghijklmnopqrstuvwxyz", ""
+    while True:
+        n, r = divmod(n, 36)
+        out = digits[r] + out
+        if n == 0:
+            return out
 
 
 def split_name(name: str) -> tuple[str, str]:
@@ -55,14 +66,35 @@ class Gen:
         for sch, tab, col, ml, prec, scale in conn.execute("select table_schema, table_name, column_name, character_maximum_length, numeric_precision, numeric_scale from information_schema.columns where table_schema !~ '^pg_' and table_schema <> 'information_schema'"):
             self.limits[(f"{sch}.{tab}", col)] = (ml, prec, scale)
         self.pool: dict[tuple[str, str], list] = {}
+        # single-column primary keys / unique indexes: values there must never repeat
+        self.unique: set[tuple[str, str]] = {
+            (f"{sch}.{tab}", col)
+            for sch, tab, col in conn.execute(
+                "select n.nspname, c.relname, a.attname from pg_index ix join pg_class c on c.oid = ix.indrelid "
+                "join pg_namespace n on n.oid = c.relnamespace join pg_attribute a on a.attrelid = c.oid and a.attnum = ix.indkey[0] "
+                "where ix.indisunique and ix.indnatts = 1 and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'")
+        }
         self.enums: dict[str, list[str]] = {}
         for typ, label in conn.execute("select t.typname, e.enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid order by e.enumsortorder"):
             self.enums.setdefault(typ, []).append(label)
 
     def value(self, name: str, typ: str, i: int, table: str = ""):
         r, f = self.rnd, self.fake
+        if typ.endswith("[]"):
+            return "{}"  # a valid empty array literal for any element type
         if typ in self.enums:
             return r.choice(self.enums[typ])
+        if (table, name) in self.unique:
+            ml = self.limits.get((table, name), (None, None, None))[0]
+            if typ in INT_TYPES:
+                return i + 1
+            if typ in TEXT_TYPES:
+                tag = _b36(i + 1)
+                if ml is None or ml >= len(tag) + 6:
+                    return f"{self.fake.word()}-{tag}"[:ml] if ml else f"{self.fake.word()}-{tag}"
+                return tag[:ml]
+        if typ not in FAKEABLE:
+            return None  # a type we cannot fake (aclitem, tsvector, …): leave NULL
         if typ in INT_TYPES:
             ranges = {"status": (0, 3), "qty": (1, 10), "rating": (1, 5), "percent_off": (5, 50), "quantity": (0, 500)}
             lo, hi = ranges.get(name, (0, 1000))
@@ -99,7 +131,7 @@ class Gen:
         return f.word()
 
 
-def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 0) -> dict[str, int]:
+def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 0, warnings: list[str] | None = None) -> dict[str, int]:
     """Fill every table. FKs are valid; cycle/self FKs are inserted NULL then UPDATEd."""
     order, deferred = fk_load_order(graph)
     dids = {f.id for f in deferred}
@@ -145,13 +177,25 @@ def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 
         if out:
             names = [c.name for c in t.columns]
             q = sql.SQL("COPY {} ({}) FROM STDIN").format(ident(tname), sql.SQL(",").join(map(sql.Identifier, names)))
-            with conn.cursor() as cur, cur.copy(q) as cp:
-                for r in out:
-                    cp.write_row([r[n] for n in names])
+            try:
+                with conn.transaction():  # a savepoint: one table failing must not abort the others
+                    with conn.cursor() as cur, cur.copy(q) as cp:
+                        for r in out:
+                            cp.write_row([r[n] for n in names])
+            except psycopg.Error as e:
+                if warnings is not None:
+                    warnings.append(f"{tname}: mock rows not loaded ({str(e).strip().splitlines()[0]})")
+                out = []
+                rows[tname] = out
         counts[tname] = len(out)
 
     for f in deferred:
-        _backfill(conn, tables, rows, f, gen)
+        try:
+            with conn.transaction():
+                _backfill(conn, tables, rows, f, gen)
+        except psycopg.Error as e:
+            if warnings is not None:
+                warnings.append(f"{f.from_.table}: could not link {f.id} ({str(e).strip().splitlines()[0]})")
 
     for t in graph.tables:
         for c in t.columns:

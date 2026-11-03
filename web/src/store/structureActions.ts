@@ -4,7 +4,7 @@ import type { Experiment, SearchRequest, StructureOp } from "../types";
 import { useStore } from "./useStore";
 
 interface Deps {
-  api: Pick<Api, "applyStructure" | "refill" | "getStructure">;
+  api: Pick<Api, "applyStructure" | "refill" | "getStructure"> & Partial<Pick<Api, "getSuggestions">>;
   search: (req: SearchRequest) => Promise<SearchOutcome>;
 }
 const real: Deps = { api: realApi, search: (req) => realSearch(req) };
@@ -23,6 +23,11 @@ export function describeOp(op: StructureOp): string {
     case "drop_column": return `− column ${short(op.table)}.${op.name}`;
     case "sql": return op.statement.replace(/\s+/g, " ").slice(0, 60);
   }
+}
+
+/** Label of an experiment: short even when many operations were applied at once. */
+export function labelFor(ops: StructureOp[]): string {
+  return ops.length <= 2 ? ops.map(describeOp).join("; ") : `${describeOp(ops[0])} and ${ops.length - 1} more`;
 }
 
 /** The best plan of a search, reduced to what the comparison table shows. */
@@ -63,12 +68,30 @@ async function rerunAndRecord(label: string, deps: Deps) {
   record(label, out);
 }
 
+/** Fetch the suggested links (relations the schema does not declare) for the current database. */
+export async function loadSuggestions(deps: { api: Partial<Pick<Api, "getSuggestions">> } = real): Promise<void> {
+  try {
+    const r = await deps.api.getSuggestions?.();
+    if (r) useStore.getState().patchStructure({ suggestions: r.suggestions, suggestionsSource: r.data_source });
+  } catch {
+    useStore.getState().patchStructure({ suggestions: [], suggestionsSource: null });
+  }
+}
+
+/** Declare suggested relations as real (NOT VALID) foreign keys in the sandbox. */
+export function addSuggestions(ids: string[], deps: Deps = real): Promise<boolean> {
+  const pick = new Set(ids);
+  const ops: StructureOp[] = useStore.getState().suggestions.filter((s) => pick.has(s.id)).map((s) => ({ kind: "add_fk", table: s.from_table, columns: s.from_columns, ref_table: s.to_table, ref_columns: s.to_columns }));
+  return ops.length ? applyStructure(ops, deps) : Promise.resolve(false);
+}
+
 const message = (e: any) => String(e?.body?.message ?? e?.message ?? e);
 
 export async function loadStructure(deps: Deps = real): Promise<void> {
   try {
     const st = await deps.api.getStructure();
     useStore.getState().patchStructure({ indexes: st.indexes, structureError: null });
+    await loadSuggestions(deps);
   } catch (e) {
     useStore.getState().patchStructure({ structureError: message(e) });
   }
@@ -83,7 +106,8 @@ export async function applyStructure(ops: StructureOp[], deps: Deps = real): Pro
     const res = await deps.api.applyStructure(ops);
     useStore.getState().replaceGraph(res.graph);
     set({ indexes: res.indexes, lastExecuted: res.executed });
-    await rerunAndRecord(ops.map(describeOp).join("; "), deps);
+    await loadSuggestions(deps);
+    await rerunAndRecord(labelFor(ops), deps);
     return true;
   } catch (e) {
     set({ structureError: message(e) });
@@ -101,6 +125,7 @@ export async function refillData(rows: number, deps: Deps = real): Promise<boole
     const res = await deps.api.refill(rows);
     useStore.getState().replaceGraph(res.graph);
     set({ indexes: res.indexes, lastExecuted: [] });
+    await loadSuggestions(deps);
     await rerunAndRecord(`Data: ${rows.toLocaleString("en-US")} rows per table`, deps);
     return true;
   } catch (e) {

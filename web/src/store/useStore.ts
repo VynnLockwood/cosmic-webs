@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
-import type { Candidate, Experiment, IndexInfo, Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
+import type { Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
 export type TierSetting = "auto" | "high" | "medium" | "low";
@@ -42,6 +42,8 @@ export interface State {
   setFkChoices(c: Record<string, string>): void;
   /** structure lab */
   indexes: IndexInfo[];
+  suggestions: Suggestion[];
+  suggestionsSource: "dump" | "mock" | "live" | null;
   experiments: Experiment[];
   structureBusy: boolean;
   structureError: string | null;
@@ -49,7 +51,11 @@ export interface State {
   /** set by replaceGraph: the next graph keeps camera and layout (no opening animation) */
   keepView: boolean;
   replaceGraph(g: SchemaGraph): void;
-  patchStructure(p: Partial<Pick<State, "indexes" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
+  patchStructure(p: Partial<Pick<State, "indexes" | "suggestions" | "suggestionsSource" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
+  importData: ImportData | null;
+  /** use the rows of an uploaded dump when it has any (otherwise mock rows are generated) */
+  useDumpData: boolean;
+  setUseDumpData(v: boolean): void;
   schemaError: SchemaError | null;
   liveError: string | null;
   warnings: string[];
@@ -106,6 +112,8 @@ export const useStore = create<State>((set) => ({
   setSearchDraft: (searchDraft) => set({ searchDraft }),
   setFkChoices: (fkChoices) => set({ fkChoices }),
   indexes: [],
+  suggestions: [],
+  suggestionsSource: null,
   experiments: [],
   structureBusy: false,
   structureError: null,
@@ -118,6 +126,9 @@ export const useStore = create<State>((set) => ({
       panelTable: graph.tables.some((t) => t.name === s.panelTable) ? s.panelTable : null,
     })),
   patchStructure: (p) => set(p),
+  importData: null,
+  useDumpData: true,
+  setUseDumpData: (useDumpData) => set({ useDumpData }),
   schemaError: null,
   liveError: null,
   warnings: [],
@@ -130,7 +141,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, experiments: [], indexes: [], structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

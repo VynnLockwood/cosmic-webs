@@ -35,13 +35,21 @@ def test_copy_without_data_terminator_does_not_swallow_the_schema():
     assert [t.name for t in parse_ddl(sql).graph.tables] == ["public.a"]
 
 
-def test_sandbox_loads_a_pg_dump(pg_dsn):
-    r = parse_ddl(DUMP)
-    out = rebuild_sandbox(DUMP, r.graph, rows_per_table=25, dsn=pg_dsn)
-    assert [t.row_estimate for t in out.tables] == [25, 25]
+def test_sandbox_loads_the_rows_of_a_pg_dump_by_default(pg_dsn):
+    out = rebuild_sandbox(DUMP, parse_ddl(DUMP).graph, rows_per_table=25, dsn=pg_dsn)
+    assert [t.row_estimate for t in out.tables] == [1, 0]  # the file has one Partner row; its other table is empty
+    with psycopg.connect(pg_dsn) as c:
+        assert c.execute('select "fullName" from "Partner"').fetchone()[0] is not None
+        assert c.execute("select nextval('public.address_seq')").fetchone()[0] >= 1  # sequence exists, owner statements skipped
+
+
+def test_sandbox_can_ignore_the_rows_of_a_pg_dump(pg_dsn):
+    from app.sandbox import rebuild_sandbox_report
+
+    r = rebuild_sandbox_report(DUMP, parse_ddl(DUMP).graph, rows_per_table=25, use_dump_data=False, dsn=pg_dsn)
+    assert [t.row_estimate for t in r.graph.tables] == [25, 25]
     with psycopg.connect(pg_dsn) as c:
         assert c.execute('select count(*) from "PartnerAddress" a join "Partner" p on p."partnerID" = a."partnerID"').fetchone()[0] == 25
-        assert c.execute("select nextval('public.address_seq')").fetchone()[0] >= 1  # sequence exists, owner statements skipped
 
 
 def test_sandbox_skips_statements_that_fail_and_reports_them(pg_dsn):

@@ -4,7 +4,9 @@ export interface Table { name: string; columns: Column[]; row_estimate: number }
 export interface FkEnd { table: string; columns: string[] }
 export interface Fk { id: string; from: FkEnd; to: FkEnd }
 export interface SchemaGraph { tables: Table[]; fks: Fk[] }
-export interface ParseResult { graph: SchemaGraph; warnings: string[] }
+/** What the sandbox now holds: the rows of the uploaded file, or generated mock rows. */
+export interface ImportData { source: "dump" | "mock"; rows_loaded: number; tables_with_data: number; tables_empty: number }
+export interface ParseResult { graph: SchemaGraph; warnings: string[]; data?: ImportData }
 
 export type BoolOp = "AND" | "OR";
 export type Cmp = "=" | "!=" | "<" | "<=" | ">" | ">=" | "IN" | "NOT IN" | "LIKE" | "ILIKE" | "IS NULL" | "IS NOT NULL" | "BETWEEN";
@@ -62,3 +64,10 @@ export interface Experiment {
   best: { id: string; shape: Shape; joins: number; queries: number; value: number; metric: "cost" | "time"; score: number; sql: string } | null;
   flags: number;
 }
+
+/** A relation the schema does not declare, inferred from column names and (for real data) confirmed by the rows. */
+export interface Suggestion {
+  id: string; from_table: string; from_columns: string[]; to_table: string; to_columns: string[]; reason: string;
+  checked: number | null; matched: number | null; verified: boolean;
+}
+export interface SuggestionsResult { data_source: "dump" | "mock" | "live"; suggestions: Suggestion[] }

@@ -54,6 +54,7 @@ class RefillIn(BaseModel):
 def refill(body: RefillIn):
     _sandbox_only()
     graph = refill_sandbox(body.rows_per_table)
+    registry.data_source = "mock"
     _after_change(graph)
     with admin_conn() as conn:
         return {**state(conn), "graph": graph.model_dump(by_alias=True)}

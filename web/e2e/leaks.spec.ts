@@ -17,7 +17,7 @@ test("swapping the schema many times does not grow GPU memory", async ({ page })
   const gpu = () => page.evaluate(() => (window as any).__cosmos.gpu() as { geometries: number; textures: number });
   const swap = async (graph: any) => {
     await page.evaluate((g) => (window as any).__cosmos.setStore({ graph: g }), graph);
-    await page.waitForFunction((n) => (window as any).__cosmos.dotCount === n, graph.tables.length);
+    await page.waitForFunction((n) => (window as any).__cosmos.dotCount === n, graph.tables.length, { timeout: 30_000 });
     await page.waitForTimeout(250); // let React commit and dispose the previous geometry
   };
   for (let i = 0; i < 3; i++) { await swap(big); await swap(shop); }

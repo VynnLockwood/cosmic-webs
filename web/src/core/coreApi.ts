@@ -2,7 +2,8 @@ import type * as Wasm from "@wasm/cosmos_core.js";
 import type { Candidate, ExplainCost, Flag, Ranked, SchemaGraph, SearchRequest } from "../types";
 
 export interface CoreApi {
-  layoutNew(graph: SchemaGraph, seed: number): Promise<void>;
+  /** `initial` = x,y,z per table (NaN = place randomly): keeps an edited graph's shape */
+  layoutNew(graph: SchemaGraph, seed: number, initial?: Float32Array | number[]): Promise<void>;
   layoutStep(n: number): Promise<Float32Array>;
   layoutSettled(): Promise<boolean>;
   planCandidates(graph: SchemaGraph, req: SearchRequest): Promise<Candidate[]>;
@@ -16,9 +17,9 @@ export function createCoreApi(wasm: typeof Wasm): CoreApi {
   let layout: Wasm.WasmLayout | null = null;
   const j = JSON.stringify;
   return {
-    async layoutNew(graph, seed) {
+    async layoutNew(graph, seed, initial) {
       layout?.free?.();
-      layout = new wasm.WasmLayout(j(graph), seed);
+      layout = initial && initial.length ? wasm.WasmLayout.with_positions(j(graph), seed, initial) : new wasm.WasmLayout(j(graph), seed);
     },
     async layoutStep(n) {
       if (!layout) throw new Error("layout not initialised");

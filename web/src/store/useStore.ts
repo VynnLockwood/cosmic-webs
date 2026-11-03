@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
-import type { Candidate, Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
+import type { Candidate, Experiment, IndexInfo, Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
-export type Drawer = "schema" | "source" | "search" | "results" | "settings" | null;
+export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
 export type TierSetting = "auto" | "high" | "medium" | "low";
 
 export interface State {
@@ -40,6 +40,16 @@ export interface State {
   setSearchSelect(v: string[]): void;
   setSearchDraft(d: Draft | null): void;
   setFkChoices(c: Record<string, string>): void;
+  /** structure lab */
+  indexes: IndexInfo[];
+  experiments: Experiment[];
+  structureBusy: boolean;
+  structureError: string | null;
+  lastExecuted: string[];
+  /** set by replaceGraph: the next graph keeps camera and layout (no opening animation) */
+  keepView: boolean;
+  replaceGraph(g: SchemaGraph): void;
+  patchStructure(p: Partial<Pick<State, "indexes" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
   schemaError: SchemaError | null;
   liveError: string | null;
   warnings: string[];
@@ -95,6 +105,19 @@ export const useStore = create<State>((set) => ({
   setSearchSelect: (searchSelect) => set({ searchSelect }),
   setSearchDraft: (searchDraft) => set({ searchDraft }),
   setFkChoices: (fkChoices) => set({ fkChoices }),
+  indexes: [],
+  experiments: [],
+  structureBusy: false,
+  structureError: null,
+  lastExecuted: [],
+  keepView: false,
+  replaceGraph: (graph) =>
+    set((s) => ({
+      graph, keepView: true, hoveredTable: null, dotOverrides: {}, linkOverrides: {},
+      selectedTable: graph.tables.some((t) => t.name === s.selectedTable) ? s.selectedTable : null,
+      panelTable: graph.tables.some((t) => t.name === s.panelTable) ? s.panelTable : null,
+    })),
+  patchStructure: (p) => set(p),
   schemaError: null,
   liveError: null,
   warnings: [],
@@ -107,7 +130,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, experiments: [], indexes: [], structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

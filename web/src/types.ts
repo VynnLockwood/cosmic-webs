@@ -40,3 +40,25 @@ export interface LiveParams { host: string; port: number; dbname: string; user: 
 export interface RowsPage { columns: string[]; rows: unknown[][]; total_estimate: number }
 export interface RunResult { columns: string[]; rows: unknown[][]; row_count: number; flags: Flag[] }
 export interface SchemaError { message: string; line: number; col: number }
+
+// ---- structure lab (sandbox-only schema editing) ----
+export interface IndexInfo { schema: string; table: string; name: string; columns: string[]; unique: boolean; primary: boolean; definition: string }
+export type StructureOp =
+  | { kind: "create_index"; table: string; columns: string[]; unique?: boolean }
+  | { kind: "drop_index"; schema: string; name: string }
+  | { kind: "add_fk"; table: string; columns: string[]; ref_table: string; ref_columns: string[]; validate?: boolean }
+  | { kind: "drop_fk"; table: string; name: string }
+  | { kind: "add_column"; table: string; name: string; type: string }
+  | { kind: "drop_column"; table: string; name: string }
+  | { kind: "sql"; statement: string };
+export interface StructureState { graph: SchemaGraph; indexes: IndexInfo[] }
+export type StructureResult = StructureState & { executed: string[] };
+
+/** One row of the before/after comparison: the best plan after a change. */
+export interface Experiment {
+  id: number;
+  label: string;
+  plans: number;
+  best: { id: string; shape: Shape; joins: number; queries: number; value: number; metric: "cost" | "time"; score: number; sql: string } | null;
+  flags: number;
+}

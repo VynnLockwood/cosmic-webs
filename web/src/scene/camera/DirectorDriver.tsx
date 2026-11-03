@@ -108,6 +108,13 @@ export function DirectorDriver() {
   // New graph: restart the opening burst and glide.
   useEffect(() => {
     if (!graph) return;
+    if (useStore.getState().keepView) {
+      // structure edit: same camera, same layout, no opening animation
+      st.current.opened = graph;
+      motion.bang = motion.linkFade = 1;
+      useStore.setState({ keepView: false });
+      return;
+    }
     st.current.opened = null;
     st.current.stack = [];
     st.current.bangStart = E2E || reduced() ? -1 : performance.now();

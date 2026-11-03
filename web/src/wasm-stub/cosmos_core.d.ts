@@ -1,6 +1,7 @@
 export default function init(): Promise<unknown>;
 export class WasmLayout {
   constructor(graph_json: string, seed: number);
+  static with_positions(graph_json: string, seed: number, init: Float32Array | number[]): WasmLayout;
   step(n: number): void;
   positions(): Float32Array;
   settled(): boolean;

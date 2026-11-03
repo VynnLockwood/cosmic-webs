@@ -32,7 +32,7 @@ export function WhyThisRank({ r, position, first, next }: { r: Ranked; position:
               <tr key={l.key}>
                 <td>{l.label}</td><td><b>{l.value}</b></td><td>{l.best}</td><td>{l.worst}</td><td>{Math.round(l.weight * 100)}%</td>
                 <td>
-                  <span style={{ display: "inline-block", height: 6, width: Math.max(2, l.points * 120), background: "var(--amber)", borderRadius: 3, marginRight: 6, verticalAlign: "middle" }} />
+                  <span style={{ display: "inline-block", height: 6, width: Math.max(2, l.points * 70), background: "var(--amber)", borderRadius: 3, marginRight: 6, verticalAlign: "middle" }} />
                   {l.points.toFixed(2)}
                 </td>
               </tr>

@@ -21,6 +21,14 @@ plus `sandbox-pg` (Postgres 16 with generated mock data). The default 25-table s
   the API runs `EXPLAIN` on each, and the best 5 are shown with SQL, joins, queries and cost.
   Unreachable tables, ambiguous FKs, type mismatches, timeouts and permission errors are flagged.
 
+- **Why is plan #1 first?** Every result card has a *Why #n?* score sheet: the four things compared (run time or estimated cost 50 %,
+  queries 25 %, joins 15 %, rows 10 %), where the plan sits between the best and worst of the compared plans, and the points each adds.
+  In the sandbox every plan is really executed (median of 3 timed runs after a warm-up), so the rank follows measured run time; on a live
+  database it follows the planner's estimate. Split plans return separate result sets, so they are hidden unless you include them.
+- **Structure lab** (sandbox only): add or drop indexes, links (FKs) and columns, run one DDL statement, or change the data size
+  (up to 100,000 rows per table). The web updates in place, your search re-runs, and a *Before / after* table shows how the best plan changed.
+- **Import**: pgAdmin / `pg_dump` exports work as they are (`\restrict` lines, `COPY` data, owners, sequences and grants are skipped).
+
 Keys: drag = rotate · right-drag = pan · wheel = zoom · `/` search · `Esc` back · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
 
 ## Layout
@@ -51,4 +59,6 @@ cd core && cargo test --release
   Postgres, so the Rust ↔ Python JSON contract is checked without a browser.
 - Browser tests mock the API unless `E2E_REAL_API=1`. Visual baselines are recorded with the stub layout on Linux/SwiftShader.
 - Performance targets (500 tables ≥ 50 fps, layout < 3 s): the layout budget is a Rust test; the fps check runs with `PERF=1` on a machine with a GPU.
+- The sandbox login is a Postgres superuser only for building tables and filling data. User-supplied DDL runs as `cosmos_ddl` and every
+  user-supplied SELECT as the read-only `cosmos_ro`, so neither can read server files.
 - Set `CHROMIUM_PATH` to use a specific Chromium for Playwright.

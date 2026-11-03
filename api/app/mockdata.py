@@ -54,6 +54,7 @@ class Gen:
         self.limits: dict[tuple[str, str], tuple] = {}
         for sch, tab, col, ml, prec, scale in conn.execute("select table_schema, table_name, column_name, character_maximum_length, numeric_precision, numeric_scale from information_schema.columns where table_schema !~ '^pg_' and table_schema <> 'information_schema'"):
             self.limits[(f"{sch}.{tab}", col)] = (ml, prec, scale)
+        self.pool: dict[tuple[str, str], list] = {}
         self.enums: dict[str, list[str]] = {}
         for typ, label in conn.execute("select t.typname, e.enumlabel from pg_enum e join pg_type t on t.oid = e.enumtypid order by e.enumsortorder"):
             self.enums.setdefault(typ, []).append(label)
@@ -67,10 +68,16 @@ class Gen:
             lo, hi = ranges.get(name, (0, 1000))
             return r.randint(lo, hi)
         if typ in ("text", "varchar", "bpchar", "citext"):
+            key = (name, typ)
+            if key in self.pool:
+                v = r.choice(self.pool[key])
+                return v[:ml] if (ml := self.limits.get((table, name), (None, None, None))[0]) else v
             by = {"email": f.email, "contact_email": f.email, "name": f.name, "city": f.city, "country": f.country,
                   "line1": f.street_address, "label": f.word, "code": lambda: f.bothify("????-####").upper(),
                   "body": f.sentence, "reason": f.sentence, "action": f.word, "tracking": f.word}
-            v = by.get(name, f.word)()
+            fn = by.get(name, f.word)
+            self.pool[key] = [fn() for _ in range(400)]  # Faker is slow: draw from a pool of 400 per column kind
+            v = r.choice(self.pool[key])
             return v[:ml] if (ml := self.limits.get((table, name), (None, None, None))[0]) else v
         if typ == "bool":
             return r.random() < 0.5
@@ -137,9 +144,10 @@ def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 
         rows[tname] = out
         if out:
             names = [c.name for c in t.columns]
-            q = sql.SQL("insert into {} ({}) values ({})").format(ident(tname), sql.SQL(",").join(map(sql.Identifier, names)), sql.SQL(",").join(sql.Placeholder() * len(names)))
-            with conn.cursor() as cur:
-                cur.executemany(q, [[r[n] for n in names] for r in out])
+            q = sql.SQL("COPY {} ({}) FROM STDIN").format(ident(tname), sql.SQL(",").join(map(sql.Identifier, names)))
+            with conn.cursor() as cur, cur.copy(q) as cp:
+                for r in out:
+                    cp.write_row([r[n] for n in names])
         counts[tname] = len(out)
 
     for f in deferred:
@@ -154,23 +162,20 @@ def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 
 
 
 def _backfill(conn, tables: dict[str, Table], rows, f: Fk, gen: Gen) -> None:
+    """Point deferred (cycle / self-reference) FK columns at existing parent rows with one set-based UPDATE.
+
+    Nullable columns keep about 5 % NULLs; NOT NULL columns always get a value.
+    """
     child, parent = f.from_.table, f.to.table
-    pk = [c.name for c in tables[child].columns if c.pk]
-    if not pk or not rows[parent]:
+    if not rows[parent] or not rows[child]:
         return
-    ptuples = [tuple(p[c] for c in f.to.columns) for p in rows[parent]]
     nullable = all(next(c for c in tables[child].columns if c.name == x).nullable for x in f.from_.columns)
-    sets = sql.SQL(",").join(sql.SQL("{} = %s").format(sql.Identifier(c)) for c in f.from_.columns)
-    where = sql.SQL(" and ").join(sql.SQL("{} = %s").format(sql.Identifier(c)) for c in pk)
-    q = sql.SQL("update {} set {} where {}").format(ident(child), sets, where)
-    params = []
-    for idx, row in enumerate(rows[child]):
-        if child == parent:  # self reference: point at an earlier row; first row stays NULL
-            if idx == 0 and nullable:
-                continue
-            tup = ptuples[gen.rnd.randrange(0, idx)] if idx > 0 else ptuples[0]
-        else:
-            tup = gen.rnd.choice(ptuples)
-        params.append([*tup, *[row[c] for c in pk]])
-    with conn.cursor() as cur:
-        cur.executemany(q, params)
+    pcols = sql.SQL(",").join(sql.Identifier(c) for c in f.to.columns)
+    sets = sql.SQL(",").join(sql.SQL("{} = parent.{}").format(sql.Identifier(a), sql.Identifier(b)) for a, b in zip(f.from_.columns, f.to.columns))
+    keep = sql.SQL("random() >= 0.05") if nullable else sql.SQL("true")
+    q = sql.SQL(
+        "WITH parent AS (SELECT {pcols}, row_number() OVER () - 1 AS rn FROM {parent}), "
+        "pick AS (SELECT c.ctid AS cid, floor(random() * (SELECT count(*) FROM parent))::bigint AS k FROM {child} c) "
+        "UPDATE {child} AS c SET {sets} FROM pick JOIN parent ON parent.rn = pick.k WHERE c.ctid = pick.cid AND {keep}"
+    ).format(pcols=pcols, parent=ident(parent), child=ident(child), sets=sets, keep=keep)
+    conn.execute(q)

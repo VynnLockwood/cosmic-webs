@@ -26,6 +26,12 @@ def error_response(e: DdlError) -> JSONResponse:
 _default_cache: dict | None = None
 
 
+def invalidate_default() -> None:
+    """The sandbox no longer matches samples/shop.sql (structure or data changed)."""
+    global _default_cache
+    _default_cache = None
+
+
 def _load(ddl: str) -> dict:
     r = parse_ddl(ddl)
     if os.environ.get("SANDBOX_DSN"):

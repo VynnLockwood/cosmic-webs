@@ -118,3 +118,32 @@ def test_measured_run_time_flows_through_the_ranker_with_a_full_score_sheet(cli,
         d = r["detail"]
         assert abs(sum(m["points"] for m in d.values()) - r["score"]) < 1e-9
         assert r["compared"] == len(cands)
+
+
+def test_adding_an_index_lowers_the_best_plans_cost_and_time_via_the_real_ranker(cli, pg_dsn, monkeypatch):
+    """The 'structure lab' loop: search, change the structure, search again, compare the best plans."""
+    from app.ddl import parse_ddl
+    from app.sandbox import rebuild_sandbox
+
+    ddl = "create table customers(id serial primary key, name text); create table orders(id serial primary key, customer_id int references customers(id), total numeric(10,2));"
+    monkeypatch.setenv("SANDBOX_DSN", pg_dsn)
+    graph = rebuild_sandbox(ddl, parse_ddl(ddl).graph, rows_per_table=30000, dsn=pg_dsn)
+    registry.use_sandbox()
+    registry.graph = graph
+    c = TestClient(app)
+    request = {"select": ["public.orders.id", "public.orders.total"], "where": {"col": "public.orders.customer_id", "cmp": "=", "value": 42}, "fk_choices": {}}
+
+    def best(analyze):
+        g = c.get("/api/structure").json()["graph"]
+        cands, explain, out = pipeline(cli, c, g, request, analyze=analyze)
+        return out["ranked"][0]
+
+    before_cost, before_time = best(False), best(True)
+    r = c.post("/api/structure/apply", json={"ops": [{"kind": "create_index", "table": "public.orders", "columns": ["customer_id"]}]})
+    assert r.status_code == 200, r.text
+    after_cost, after_time = best(False), best(True)
+    assert after_cost["detail"]["cost"]["value"] < before_cost["detail"]["cost"]["value"] / 5
+    assert after_time["metric"] == "time"
+    assert after_time["detail"]["cost"]["value"] < before_time["detail"]["cost"]["value"]
+    registry.use_sandbox()
+    registry.graph = None

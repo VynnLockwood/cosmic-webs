@@ -2,12 +2,14 @@
 from .models import Column, Fk, FkEnd, SchemaGraph, Table
 
 
-def introspect(conn, schema: str) -> SchemaGraph:
+def introspect(conn, schema: str | None) -> SchemaGraph:
+    """Tables and foreign keys of one schema, or of every non-system schema when `schema` is None."""
     tables: dict[int, Table] = {}
-    for oid, rel, reltuples in conn.execute(
-        "select c.oid, c.relname, c.reltuples::bigint from pg_class c join pg_namespace n on n.oid = c.relnamespace "
-        "where n.nspname = %s and c.relkind in ('r','p') order by c.relname", (schema,)):
-        tables[oid] = Table(name=f"{schema}.{rel}", columns=[], row_estimate=max(int(reltuples), 0))
+    for oid, sch, rel, reltuples in conn.execute(
+        "select c.oid, n.nspname, c.relname, c.reltuples::bigint from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+        "where (n.nspname = %(s)s or (%(s)s::text is null and n.nspname !~ '^pg_' and n.nspname <> 'information_schema')) "
+        "and c.relkind in ('r','p') order by n.nspname, c.relname", {"s": schema}):
+        tables[oid] = Table(name=f"{sch}.{rel}", columns=[], row_estimate=max(int(reltuples), 0))
     pk: set[tuple[int, int]] = set()
     for oid, keys in conn.execute("select conrelid, conkey from pg_constraint where contype = 'p' and conrelid = any(%s)", (list(tables),)):
         pk |= {(oid, k) for k in keys}

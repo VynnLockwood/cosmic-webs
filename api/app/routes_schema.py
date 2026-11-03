@@ -17,6 +17,7 @@ SAMPLES = Path(os.environ.get("SAMPLES_DIR", Path(__file__).resolve().parents[2]
 
 class SchemaIn(BaseModel):
     ddl: str
+    use_dump_data: bool = True  # load the rows of the file when it has any (otherwise generate mock rows)
 
 
 def error_response(e: DdlError) -> JSONResponse:
@@ -32,24 +33,28 @@ def invalidate_default() -> None:
     _default_cache = None
 
 
-def _load(ddl: str) -> dict:
+def _load(ddl: str, use_dump_data: bool = True) -> dict:
     r = parse_ddl(ddl)
+    out = r.model_dump(by_alias=True)
     if os.environ.get("SANDBOX_DSN"):
         try:
-            r.graph, notes = rebuild_sandbox_report(ddl, r.graph)
-            r.warnings.extend(notes)
+            rep = rebuild_sandbox_report(ddl, r.graph, use_dump_data=use_dump_data)
+            r.graph = rep.graph
+            r.warnings.extend(rep.warnings)
+            out["data"] = {"source": rep.data_source, "rows_loaded": rep.rows_loaded, "tables_with_data": rep.tables_with_data, "tables_empty": rep.tables_empty}
             registry.use_sandbox()
             registry.graph = r.graph
         except psycopg.Error as e:
             r.warnings.append(f"sandbox unavailable: {e}")
-    return r.model_dump(by_alias=True)
+        out["graph"], out["warnings"] = r.graph.model_dump(by_alias=True), r.warnings
+    return out
 
 
 @router.post("/schema")
 def post_schema(body: SchemaIn):
     global _default_cache
     try:
-        out = _load(body.ddl)
+        out = _load(body.ddl, body.use_dump_data)
     except DdlError as e:
         return error_response(e)
     _default_cache = None

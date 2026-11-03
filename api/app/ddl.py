@@ -1,5 +1,6 @@
 """Parse Postgres DDL into a SchemaGraph using pglast."""
 import re
+from dataclasses import dataclass
 
 from pglast import ast, parse_sql
 from pglast.enums import AlterTableType, ConstrType
@@ -45,6 +46,38 @@ def strip_psql(sql: str) -> str:
     return "".join(out)
 
 
+@dataclass
+class CopyBlock:
+    """One `COPY table (cols) FROM stdin;` data block of a dump: raw text-format rows, ready to stream into COPY."""
+
+    table: str
+    columns: list[str]
+    data: str
+    rows: int
+
+
+def extract_copy_blocks(sql: str) -> list[CopyBlock]:
+    """The data blocks of a pg_dump / pgAdmin export, in file order (text format only)."""
+    lines = sql.splitlines(keepends=True)
+    blocks: list[CopyBlock] = []
+    i = 0
+    while i < len(lines):
+        if _COPY_START.match(lines[i]):
+            header, data = lines[i], []
+            i += 1
+            while i < len(lines) and lines[i].rstrip("\r\n") != "\\.":
+                data.append(lines[i].replace("\r\n", "\n"))
+                i += 1
+            try:
+                stmt = parse_sql(header.strip())[0].stmt
+            except ParseError:
+                stmt = None
+            if isinstance(stmt, ast.CopyStmt) and not stmt.options and stmt.is_from:
+                blocks.append(CopyBlock(_qname(stmt.relation), [a.sval for a in (stmt.attlist or ())], "".join(data), len(data)))
+        i += 1
+    return blocks
+
+
 def _qname(rel: ast.RangeVar) -> str:
     return f"{rel.schemaname or 'public'}.{rel.relname}"
 
@@ -55,7 +88,7 @@ def _strs(nodes) -> list[str]:
 
 def _type_name(tn: ast.TypeName) -> str:
     last = tn.names[-1].sval
-    return TYPE_ALIASES.get(last, last)
+    return TYPE_ALIASES.get(last, last) + ("[]" if tn.arrayBounds else "")
 
 
 def parse_ddl(sql: str) -> ParseResult:

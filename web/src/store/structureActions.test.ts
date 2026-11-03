@@ -93,3 +93,41 @@ test("loading a new schema starts a fresh lab", () => {
   useStore.getState().setGraph(graph);
   expect(useStore.getState().experiments).toEqual([]);
 });
+
+import { addSuggestions, labelFor, loadSuggestions } from "./structureActions";
+import type { Suggestion } from "../types";
+
+const sug = (id: string, verified: boolean, checked: number | null = verified ? 5 : null): Suggestion => ({
+  id, from_table: `public.${id}`, from_columns: ["p"], to_table: "public.parent", to_columns: ["id"], reason: "", checked, matched: verified ? checked : null, verified,
+});
+
+test("loadSuggestions stores the list and where its evidence comes from", async () => {
+  await loadSuggestions({ api: { getSuggestions: async () => ({ data_source: "dump", suggestions: [sug("a", true)] }) } });
+  expect(useStore.getState().suggestions.map((s) => s.id)).toEqual(["a"]);
+  expect(useStore.getState().suggestionsSource).toBe("dump");
+});
+
+test("a failing suggestions call leaves an empty list, not an error", async () => {
+  useStore.getState().patchStructure({ suggestions: [sug("a", true)] });
+  await loadSuggestions({ api: { getSuggestions: async () => { throw new Error("down"); } } });
+  expect(useStore.getState().suggestions).toEqual([]);
+});
+
+test("addSuggestions declares the chosen relations as foreign keys in one change", async () => {
+  useStore.getState().patchStructure({ suggestions: [sug("a", true), sug("b", false), sug("c", true)] });
+  const seen: any[] = [];
+  const d = fakes([1]);
+  d.api.applyStructure = async (ops: any) => (seen.push(ops), { graph, indexes: [], executed: [] });
+  expect(await addSuggestions(["a", "c"], d as any)).toBe(true);
+  expect(seen[0]).toEqual([
+    { kind: "add_fk", table: "public.a", columns: ["p"], ref_table: "public.parent", ref_columns: ["id"] },
+    { kind: "add_fk", table: "public.c", columns: ["p"], ref_table: "public.parent", ref_columns: ["id"] },
+  ]);
+  expect(await addSuggestions(["nope"], d as any)).toBe(false);
+});
+
+test("labels stay short when many links are added at once", () => {
+  const ops = ["a", "b", "c", "d"].map((t) => ({ kind: "add_fk" as const, table: `public.${t}`, columns: ["p"], ref_table: "public.parent", ref_columns: ["id"] }));
+  expect(labelFor(ops)).toBe("+ FK a(p) → parent(id) and 3 more");
+  expect(labelFor(ops.slice(0, 2))).toContain(";");
+});

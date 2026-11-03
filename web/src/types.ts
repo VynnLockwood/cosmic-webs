@@ -64,3 +64,10 @@ export interface Experiment {
   best: { id: string; shape: Shape; joins: number; queries: number; value: number; metric: "cost" | "time"; score: number; sql: string } | null;
   flags: number;
 }
+
+/** A relation the schema does not declare, inferred from column names and (for real data) confirmed by the rows. */
+export interface Suggestion {
+  id: string; from_table: string; from_columns: string[]; to_table: string; to_columns: string[]; reason: string;
+  checked: number | null; matched: number | null; verified: boolean;
+}
+export interface SuggestionsResult { data_source: "dump" | "mock" | "live"; suggestions: Suggestion[] }

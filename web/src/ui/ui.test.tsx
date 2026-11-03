@@ -72,3 +72,14 @@ test("the 'use rows in the file' choice is sent with the upload", async () => {
   await act(() => loadSchema("create table a(id int);", { api }));
   expect(sent).toEqual([["create table a(id int);", false]]);
 });
+
+test("the schema panel points to suggested links after a load", () => {
+  useStore.setState({ importData: null, suggestions: [
+    { id: "a", from_table: "public.a", from_columns: ["p"], to_table: "public.p", to_columns: ["id"], reason: "", checked: 3, matched: 3, verified: true },
+    { id: "b", from_table: "public.b", from_columns: ["p"], to_table: "public.p", to_columns: ["id"], reason: "", checked: null, matched: null, verified: false },
+  ] });
+  render(<SchemaPanel />);
+  expect(screen.getByText(/2 possible links the file does not declare \(1 confirmed by its rows\)/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Review in Structure lab" }));
+  expect(useStore.getState().drawer).toBe("structure");
+});

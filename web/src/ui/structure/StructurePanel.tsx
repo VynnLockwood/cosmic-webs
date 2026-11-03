@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { applyStructure, deltaPct, loadStructure, refillData } from "../../store/structureActions";
 import { useStore } from "../../store/useStore";
 import type { StructureOp } from "../../types";
+import { SuggestedLinks } from "./SuggestedLinks";
 
 const short = (t: string) => t.replace(/^public\./, "");
 const TYPES = ["int4", "int8", "text", "varchar", "bool", "numeric", "timestamptz", "date", "uuid", "jsonb", "float8"];
@@ -203,6 +204,7 @@ export function StructurePanel() {
       <>
         <h2>Structure lab</h2>
         <p className="warn">Structure editing only works on the sandbox, never on a live database. Switch the data source back to the sandbox to experiment.</p>
+        <SuggestedLinks canAdd={false} />
       </>
     );
   }
@@ -214,6 +216,7 @@ export function StructurePanel() {
       {error && <div className="err" role="alert">{error}</div>}
       {executed.length > 0 && <pre className="mono" style={{ whiteSpace: "pre-wrap", margin: "6px 0", color: "var(--ui-muted)" }} aria-label="Executed SQL">{executed.join(";\n")}</pre>}
       <ExperimentsSection />
+      <SuggestedLinks canAdd />
       <IndexSection run={run} busy={busy} />
       <FkSection run={run} busy={busy} />
       <ColumnSection run={run} busy={busy} />

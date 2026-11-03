@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Group } from "three";
 import { useStore } from "../store/useStore";
 import { motion } from "./camera/motion";
+import { labelText } from "./style";
 
-const NEAREST = 12;
+const NEAREST = 8;
+/** Labels sit below the UI layer (z-index 5) so they never draw over panels. */
+const Z_RANGE: [number, number] = [4, 0];
 
 function Label({ index, name, strong }: { index: number; name: string; strong: boolean }) {
   const group = useRef<Group>(null!);
@@ -22,9 +25,9 @@ function Label({ index, name, strong }: { index: number; name: string; strong: b
   });
   return (
     <group ref={group}>
-      <Html center style={{ pointerEvents: "none", transform: "translate(0, -22px)" }}>
+      <Html center zIndexRange={Z_RANGE} style={{ pointerEvents: "none", transform: "translate(0, -22px)" }}>
         <div ref={div} style={{ whiteSpace: "nowrap", fontSize: 11, color: "#E6E9FF", textShadow: "0 0 6px #05060F", fontWeight: strong ? 600 : 400 }}>
-          {name.replace(/^public\./, "")}
+          {labelText(name)}
         </div>
       </Html>
     </group>

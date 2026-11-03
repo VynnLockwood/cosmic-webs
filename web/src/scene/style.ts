@@ -74,3 +74,9 @@ export function pulseBoost(slot: number, slots: number, cycle: number): number {
   const pos = (cycle / PULSE_FRACTION) * slots;
   return Math.max(0, 1 - Math.abs(slot + 0.5 - pos) / 2.5) * 1.4;
 }
+
+/** Table label text: schema prefix dropped, long names shortened so labels do not pile up. */
+export function labelText(name: string, max = 22): string {
+  const n = name.replace(/^public\./, "");
+  return n.length > max ? `${n.slice(0, max - 1)}…` : n;
+}

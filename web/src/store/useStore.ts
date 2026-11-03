@@ -5,6 +5,13 @@ import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
+/** how SQL is shown and copied: with $1 bind parameters, or with the values written in */
+export type SqlMode = "params" | "hardcoded";
+const SQLMODE_KEY = "cosmos.sqlMode";
+export function loadSqlMode(): SqlMode {
+  try { return localStorage.getItem(SQLMODE_KEY) === "params" ? "params" : "hardcoded"; } catch { return "hardcoded"; }
+}
+
 export interface PanelWidths { drawer: number | null; panel: number | null }
 const WIDTHS_KEY = "cosmos.widths";
 /** Saved panel widths (null = default). A broken saved value is ignored. */
@@ -40,6 +47,8 @@ export interface State {
   setSearchOptions(o: { measureTime?: boolean; includeSplit?: boolean }): void;
   flags: Flag[];
   tier: TierSetting;
+  sqlMode: SqlMode;
+  setSqlMode(m: SqlMode): void;
   /** widths the user dragged the side panels to (null = default) */
   panelWidths: PanelWidths;
   setPanelWidth(k: keyof PanelWidths, w: number | null): void;
@@ -125,6 +134,11 @@ export const useStore = create<State>((set) => ({
   setSearchOptions: (o) => set(o),
   flags: [],
   tier: initialTier(),
+  sqlMode: loadSqlMode(),
+  setSqlMode: (sqlMode) => {
+    try { localStorage.setItem(SQLMODE_KEY, sqlMode); } catch { /* private mode */ }
+    set({ sqlMode });
+  },
   panelWidths: loadWidths(),
   setPanelWidth: (k, w) =>
     set((s) => {

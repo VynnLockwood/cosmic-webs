@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
 import type { ChangeEntry } from "./exportScripts";
+import { clearVisual, DEFAULT_VISUAL, loadVisual, normalizeVisual, saveVisual, type VisualSettings } from "./visualSettings";
 import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
@@ -49,6 +50,10 @@ export interface State {
   flags: Flag[];
   tier: TierSetting;
   sqlMode: SqlMode;
+  /** star size, brightness, web line, spin speed (saved in localStorage) */
+  visual: VisualSettings;
+  setVisual(p: Partial<VisualSettings>): void;
+  resetVisual(): void;
   setSqlMode(m: SqlMode): void;
   /** widths the user dragged the side panels to (null = default) */
   panelWidths: PanelWidths;
@@ -138,6 +143,17 @@ export const useStore = create<State>((set) => ({
   flags: [],
   tier: initialTier(),
   sqlMode: loadSqlMode(),
+  visual: loadVisual(),
+  setVisual: (p) =>
+    set((s) => {
+      const visual = normalizeVisual({ ...s.visual, ...p });
+      saveVisual(visual);
+      return { visual };
+    }),
+  resetVisual: () => {
+    clearVisual();
+    set({ visual: { ...DEFAULT_VISUAL } });
+  },
   setSqlMode: (sqlMode) => {
     try { localStorage.setItem(SQLMODE_KEY, sqlMode); } catch { /* private mode */ }
     set({ sqlMode });

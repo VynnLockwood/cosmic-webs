@@ -62,7 +62,8 @@ function Rig() {
       cam.controls = null;
     };
   }, []);
-  return <CameraControls ref={ref} makeDefault dampingFactor={0.08} />;
+  const spin = useStore((s) => s.visual.spin);
+  return <CameraControls ref={ref} makeDefault dampingFactor={0.08} azimuthRotateSpeed={spin} polarRotateSpeed={spin} />;
 }
 
 export default function Scene() {

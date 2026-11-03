@@ -19,7 +19,7 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
 
 export const api = {
   getDefaultSchema: () => call<ParseResult>("GET", "/schema/default"),
-  postSchema: (ddl: string) => call<ParseResult>("POST", "/schema", { ddl }),
+  postSchema: (ddl: string, useDumpData = true) => call<ParseResult>("POST", "/schema", { ddl, use_dump_data: useDumpData }),
   connectLive: (p: LiveParams) => call<{ graph: SchemaGraph }>("POST", "/source/live", p),
   disconnectLive: () => call<{ mode: string }>("DELETE", "/source/live"),
   getRows: (table: string, limit = 50, offset = 0) => call<RowsPage>("GET", `/tables/${encodeURIComponent(table)}/rows?limit=${limit}&offset=${offset}`),

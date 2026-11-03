@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
-import type { Candidate, Experiment, IndexInfo, Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
+import type { Candidate, Experiment, ImportData, IndexInfo, Flag, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
 export type TierSetting = "auto" | "high" | "medium" | "low";
@@ -50,6 +50,10 @@ export interface State {
   keepView: boolean;
   replaceGraph(g: SchemaGraph): void;
   patchStructure(p: Partial<Pick<State, "indexes" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
+  importData: ImportData | null;
+  /** use the rows of an uploaded dump when it has any (otherwise mock rows are generated) */
+  useDumpData: boolean;
+  setUseDumpData(v: boolean): void;
   schemaError: SchemaError | null;
   liveError: string | null;
   warnings: string[];
@@ -118,6 +122,9 @@ export const useStore = create<State>((set) => ({
       panelTable: graph.tables.some((t) => t.name === s.panelTable) ? s.panelTable : null,
     })),
   patchStructure: (p) => set(p),
+  importData: null,
+  useDumpData: true,
+  setUseDumpData: (useDumpData) => set({ useDumpData }),
   schemaError: null,
   liveError: null,
   warnings: [],

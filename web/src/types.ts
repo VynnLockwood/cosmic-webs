@@ -4,7 +4,9 @@ export interface Table { name: string; columns: Column[]; row_estimate: number }
 export interface FkEnd { table: string; columns: string[] }
 export interface Fk { id: string; from: FkEnd; to: FkEnd }
 export interface SchemaGraph { tables: Table[]; fks: Fk[] }
-export interface ParseResult { graph: SchemaGraph; warnings: string[] }
+/** What the sandbox now holds: the rows of the uploaded file, or generated mock rows. */
+export interface ImportData { source: "dump" | "mock"; rows_loaded: number; tables_with_data: number; tables_empty: number }
+export interface ParseResult { graph: SchemaGraph; warnings: string[]; data?: ImportData }
 
 export type BoolOp = "AND" | "OR";
 export type Cmp = "=" | "!=" | "<" | "<=" | ">" | ">=" | "IN" | "NOT IN" | "LIKE" | "ILIKE" | "IS NULL" | "IS NOT NULL" | "BETWEEN";

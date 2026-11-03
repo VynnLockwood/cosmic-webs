@@ -19,7 +19,11 @@ export interface State {
   hoverPlan: string | null;
   setHoverPlan(id: string | null): void;
   candidates: Candidate[];
-  costs: Record<string, { total_cost: number; plan_rows: number }>;
+  costs: Record<string, { total_cost: number; plan_rows: number; exec_ms?: number | null }>;
+  splitHidden: number;
+  measureTime: boolean;
+  includeSplit: boolean;
+  setSearchOptions(o: { measureTime?: boolean; includeSplit?: boolean }): void;
   flags: Flag[];
   tier: TierSetting;
   reducedMotion: boolean;
@@ -53,7 +57,7 @@ export interface State {
   setDrawer(d: Drawer): void;
   setSourceMode(m: "sandbox" | "live"): void;
   setSearch(req: SearchRequest | null): void;
-  setResults(results: Ranked[], flags: Flag[], extra?: { candidates?: Candidate[]; costs?: Record<string, { total_cost: number; plan_rows: number }> }): void;
+  setResults(results: Ranked[], flags: Flag[], extra?: { candidates?: Candidate[]; costs?: Record<string, { total_cost: number; plan_rows: number; exec_ms?: number | null }>; splitHidden?: number }): void;
   setTier(t: TierSetting): void;
   setReducedMotion(v: boolean): void;
 }
@@ -77,6 +81,10 @@ export const useStore = create<State>((set) => ({
   setHoverPlan: (hoverPlan) => set({ hoverPlan }),
   candidates: [],
   costs: {},
+  splitHidden: 0,
+  measureTime: true,
+  includeSplit: false,
+  setSearchOptions: (o) => set(o),
   flags: [],
   tier: initialTier(),
   dotOverrides: {},
@@ -99,14 +107,14 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),
   setDrawer: (drawer) => set({ drawer }),
   setSourceMode: (sourceMode) => set({ sourceMode }),
   setSearch: (searchRequest) => set({ searchRequest }),
-  setResults: (results, flags, extra) => set({ results, flags, candidates: extra?.candidates ?? [], costs: extra?.costs ?? {} }),
+  setResults: (results, flags, extra) => set({ results, flags, candidates: extra?.candidates ?? [], costs: extra?.costs ?? {}, splitHidden: extra?.splitHidden ?? 0 }),
   setTier: (tier) => set({ tier }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
 }));

@@ -23,6 +23,7 @@ class CandidateIn(BaseModel):
 class ExplainIn(BaseModel):
     candidates: list[CandidateIn]
     analyze: bool = False
+    repeat: int = 3  # timed runs per query when analyze is on
 
 
 class RunIn(BaseModel):
@@ -38,12 +39,15 @@ def explain(body: ExplainIn):
     with registry.session() as conn:
         for cand in body.candidates:
             cost = rows = 0.0
+            ms: float | None = 0.0 if body.analyze else None
             summaries: list[str] = []
             err = None
             for q in cand.queries:
                 try:
-                    c, r, s = explain_query(conn, q.sql, q.params, body.analyze)
+                    c, r, s, t = explain_query(conn, q.sql, q.params, body.analyze, min(max(body.repeat, 1), 10))
                     cost, rows = cost + c, rows + r
+                    if ms is not None and t is not None:
+                        ms += t
                     summaries.append(s)
                 except NotSelect as e:
                     raise HTTPException(400, str(e)) from e
@@ -51,7 +55,7 @@ def explain(body: ExplainIn):
                     code, msg = classify(e)
                     err = {"code": code, "message": msg}
                     break
-            results.append({"id": cand.id, "total_cost": 0.0 if err else cost, "plan_rows": 0.0 if err else rows, "summary": " + ".join(summaries), "error": err})
+            results.append({"id": cand.id, "total_cost": 0.0 if err else cost, "plan_rows": 0.0 if err else rows, "exec_ms": None if err else ms, "summary": " + ".join(summaries), "error": err})
     return {"results": results}
 
 

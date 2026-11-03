@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import type { Candidate, Ranked, RunResult } from "../types";
+import { WhyThisRank } from "./RankExplainer";
 
-interface Props { rank: number; r: Ranked; cand: Candidate; cost?: number; onHover(id: string | null): void }
+interface Props { rank: number; r: Ranked; cand: Candidate; cost?: number; first?: Ranked; next?: Ranked; onHover(id: string | null): void }
 
-export function ResultCard({ rank, r, cand, cost, onHover }: Props) {
+export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props) {
   const [runs, setRuns] = useState<RunResult[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const sql = cand.queries.map((q) => q.sql).join(";\n");
@@ -23,16 +24,19 @@ export function ResultCard({ rank, r, cand, cost, onHover }: Props) {
         <span style={{ flex: 1, height: 6, borderRadius: 3, background: "rgba(160,180,255,.15)" }} aria-label="score">
           <span style={{ display: "block", height: "100%", width: `${Math.max(8, (1 - r.score) * 100)}%`, borderRadius: 3, background: "var(--active)" }} />
         </span>
+        <span className="mono" title="lower is better">score {r.score.toFixed(2)}</span>
       </div>
       <div className="row" style={{ flexWrap: "wrap" }}>
         <span className="badge">{cand.joins} {cand.joins === 1 ? "join" : "joins"}</span>
         <span className="badge">{cand.query_count} {cand.query_count === 1 ? "query" : "queries"}</span>
-        {cost !== undefined && <span className="badge">cost {cost.toFixed(1)}</span>}
+        {r.metric === "time" && <span className="badge">{r.detail.cost.value.toFixed(2)} ms</span>}
+        {cost !== undefined && <span className="badge">est. cost {cost.toFixed(1)}</span>}
         <span className="badge">{cand.shape}</span>
       </div>
       <pre className="mono" style={{ whiteSpace: "pre-wrap", margin: "6px 0", color: "var(--ui-text)" }}>{sql}</pre>
       {cand.queries.some((q) => q.params.length) && <div className="mono" style={{ color: "var(--ui-muted)" }}>params: {JSON.stringify(cand.queries.map((q) => q.params))}</div>}
-      <div style={{ color: "var(--ui-muted)", fontSize: 12 }}>{r.reason}</div>
+      <WhyThisRank r={r} position={rank} first={first} next={next} />
+      {cand.shape === "Split" && <div className="warn">Split plan: returns separate result sets, not one joined table.</div>}
       <div className="row">
         <button className="btn ghost" onClick={() => navigator.clipboard?.writeText(sql)}>Copy</button>
         <button className="btn" onClick={run}>Run</button>

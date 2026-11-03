@@ -23,8 +23,8 @@ export const api = {
   connectLive: (p: LiveParams) => call<{ graph: SchemaGraph }>("POST", "/source/live", p),
   disconnectLive: () => call<{ mode: string }>("DELETE", "/source/live"),
   getRows: (table: string, limit = 50, offset = 0) => call<RowsPage>("GET", `/tables/${encodeURIComponent(table)}/rows?limit=${limit}&offset=${offset}`),
-  explain: (candidates: Candidate[], analyze = false) =>
-    call<{ results: ExplainResult[] }>("POST", "/explain", { candidates: candidates.map((c) => ({ id: c.id, queries: c.queries })), analyze }),
+  explain: (candidates: Candidate[], analyze = false, repeat = 3) =>
+    call<{ results: ExplainResult[] }>("POST", "/explain", { candidates: candidates.map((c) => ({ id: c.id, queries: c.queries })), analyze, repeat }),
   run: (query: SqlQuery, limit = 100) => call<RunResult>("POST", "/run", { query, limit }),
 };
 export type Api = typeof api;

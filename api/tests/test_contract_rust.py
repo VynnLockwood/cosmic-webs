@@ -38,11 +38,11 @@ def client(shop_db, monkeypatch):
     registry.graph = None
 
 
-def pipeline(cli, c, graph, request):
+def pipeline(cli, c, graph, request, analyze=False):
     cands = call(cli, "plan", {"graph": graph, "request": request})
     assert cands, "planner returned no candidates"
-    explain = c.post("/api/explain", json={"candidates": cands}).json()["results"]
-    costs = [{"id": r["id"], "total_cost": r["total_cost"], "plan_rows": r["plan_rows"], "error": (r["error"] or {}).get("code") if r["error"] and r["error"]["code"] in ("PERMISSION", "TIMEOUT") else ("TYPE_MISMATCH" if r["error"] else None)} for r in explain]
+    explain = c.post("/api/explain", json={"candidates": cands, "analyze": analyze, "repeat": 2}).json()["results"]
+    costs = [{"id": r["id"], "total_cost": r["total_cost"], "plan_rows": r["plan_rows"], "exec_ms": r.get("exec_ms"), "error": (r["error"] or {}).get("code") if r["error"] and r["error"]["code"] in ("PERMISSION", "TIMEOUT") else ("TYPE_MISMATCH" if r["error"] else None)} for r in explain]
     return cands, explain, call(cli, "rank", {"candidates": cands, "costs": costs})
 
 
@@ -105,3 +105,16 @@ def test_values_with_quotes_and_percent_stay_params(cli, client):
     assert all(evil not in q["sql"] for x in cands for q in x["queries"])
     q = next(x for x in cands if x["id"] == out["ranked"][0]["id"])["queries"][0]
     assert c.post("/api/run", json={"query": q}).json()["row_count"] == 0
+
+
+def test_measured_run_time_flows_through_the_ranker_with_a_full_score_sheet(cli, client):
+    c, graph = client
+    request = {"select": ["public.users.email", "public.orders.total"], "where": {"col": "public.orders.status", "cmp": "<=", "value": 2}, "fk_choices": {}}
+    cands, explain, out = pipeline(cli, c, graph, request, analyze=True)
+    assert all(r["exec_ms"] and r["exec_ms"] > 0 for r in explain)
+    ranked = out["ranked"]
+    assert ranked and all(r["metric"] == "time" for r in ranked)
+    for r in ranked:
+        d = r["detail"]
+        assert abs(sum(m["points"] for m in d.values()) - r["score"]) < 1e-9
+        assert r["compared"] == len(cands)

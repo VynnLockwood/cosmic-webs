@@ -20,9 +20,21 @@ export interface Flag { code: FlagCode; table: string | null; column: string | n
 export interface SqlQuery { sql: string; params: unknown[] }
 export type Shape = "Join" | "SemiJoin" | "Split";
 export interface Candidate { id: string; shape: Shape; fk_ids: string[]; tables: string[]; queries: SqlQuery[]; joins: number; query_count: number }
-export interface ExplainCost { id: string; total_cost: number; plan_rows: number; error?: FlagCode | null }
-export interface ExplainResult { id: string; total_cost: number; plan_rows: number; summary: string; error: { code: string; message: string } | null }
-export interface Ranked { id: string; score: number; breakdown: { cost: number; joins: number; queries: number; rows: number }; reason: string }
+export interface ExplainCost { id: string; total_cost: number; plan_rows: number; exec_ms?: number | null; error?: FlagCode | null }
+export interface ExplainResult { id: string; total_cost: number; plan_rows: number; exec_ms: number | null; summary: string; error: { code: string; message: string } | null }
+export interface Metric { value: number; best: number; worst: number; norm: number; weight: number; points: number }
+export interface RankDetails { cost: Metric; queries: Metric; joins: Metric; rows: Metric }
+export interface Ranked {
+  id: string;
+  score: number;
+  breakdown: { cost: number; joins: number; queries: number; rows: number };
+  reason: string;
+  /** "time" = ranked by measured run time, "cost" = planner estimate */
+  metric: "time" | "cost";
+  /** how many plans were compared */
+  compared: number;
+  detail: RankDetails;
+}
 
 export interface LiveParams { host: string; port: number; dbname: string; user: string; password: string; schema?: string; allow_analyze?: boolean }
 export interface RowsPage { columns: string[]; rows: unknown[][]; total_estimate: number }

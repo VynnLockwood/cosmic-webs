@@ -1,5 +1,6 @@
 import { useStore } from "../store/useStore";
 import { FlagList } from "./FlagList";
+import { HowRankingWorks } from "./RankExplainer";
 import { ResultCard } from "./ResultCard";
 
 export function ResultsPanel() {
@@ -9,14 +10,17 @@ export function ResultsPanel() {
   const flags = useStore((s) => s.flags);
   const req = useStore((s) => s.searchRequest);
   const setHover = useStore((s) => s.setHoverPlan);
+  const splitHidden = useStore((s) => s.splitHidden);
   return (
     <>
       <h2>Results</h2>
       {!req && <p style={{ color: "var(--ui-muted)" }}>Run a search to see the five best query plans.</p>}
       {req && results.length === 0 && <p style={{ color: "var(--ui-muted)" }}>No runnable plan was found.{flags.length ? " See the flags below." : ""}</p>}
+      {results.length > 0 && <HowRankingWorks results={results} />}
+      {splitHidden > 0 && <div className="warn">{splitHidden} split plan(s) hidden — they return separate result sets. Enable “Include split plans” in Search to rank them too.</div>}
       {results.map((r, i) => {
         const cand = candidates.find((c) => c.id === r.id);
-        return cand ? <ResultCard key={r.id} rank={i + 1} r={r} cand={cand} cost={costs[r.id]?.total_cost} onHover={setHover} /> : null;
+        return cand ? <ResultCard key={r.id} rank={i + 1} r={r} cand={cand} cost={costs[r.id]?.total_cost} first={results[0]} next={results[i + 1]} onHover={setHover} /> : null;
       })}
       <FlagList flags={flags} />
     </>

@@ -113,3 +113,27 @@ def test_injection_value_is_data(shop):
     assert r["row_count"] == 0
     with psycopg.connect(dsn) as conn:
         assert conn.execute("select count(*) from users").fetchone()[0] == 1000
+
+
+def test_explain_analyze_reports_measured_time_summed_over_queries(shop):
+    c, _ = shop
+    q = {"sql": USERS + ' WHERE "t0"."id" < $1', "params": [500]}
+    one = c.post("/api/explain", json={"candidates": [{"id": "a", "queries": [q]}], "analyze": True, "repeat": 3}).json()["results"][0]
+    two = c.post("/api/explain", json={"candidates": [{"id": "b", "queries": [q, q]}], "analyze": True, "repeat": 3}).json()["results"][0]
+    assert one["exec_ms"] > 0 and two["exec_ms"] > one["exec_ms"]
+    plain = c.post("/api/explain", json={"candidates": [{"id": "a", "queries": [q]}]}).json()["results"][0]
+    assert plain["exec_ms"] is None
+
+
+def test_explain_analyze_runs_the_query_several_times_and_takes_the_median(monkeypatch):
+    from app import explain as ex
+
+    times = iter([9.0, 1.0, 2.0, 3.0])  # first (cold) run is discarded, median of the next three
+    class Conn:
+        def execute(self, sql, vals=None):
+            class R:
+                def fetchone(self_inner):
+                    return ([{"Plan": {"Total Cost": 5.0, "Plan Rows": 7, "Node Type": "Seq Scan"}, "Execution Time": next(times)}],)
+            return R()
+    cost, rows, summary, ms = ex.explain_query(Conn(), "select 1", [], analyze=True, repeat=3)
+    assert ms == 2.0 and (cost, rows) == (5.0, 7.0)

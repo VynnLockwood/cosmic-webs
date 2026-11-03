@@ -15,10 +15,10 @@ function rng(seed: number) {
 }
 
 const vert = /* glsl */ `
-attribute float aSize; attribute float aPhase; attribute float aFreq; attribute vec3 aColor;
+attribute float aSize; attribute float aPhase; attribute float aFreq; attribute float aMag; attribute vec3 aColor;
 uniform float uTime, uPx, uTwinkle; varying float vA; varying vec3 vC;
 void main(){
-  vA = 1.0 - 0.25 * uTwinkle * (0.5 + 0.5*sin(uTime*aFreq*6.2831853 + aPhase));
+  vA = aMag * (1.0 - 0.25 * uTwinkle * (0.5 + 0.5*sin(uTime*aFreq*6.2831853 + aPhase)));
   vC = aColor;
   gl_PointSize = aSize * uPx;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
@@ -32,23 +32,36 @@ void main(){
   gl_FragColor = vec4(vC, a*vA);
 }`;
 
+/** Star colours by temperature: blue-white, white, yellow, orange, red (rarer at the ends). */
+const PALETTE: [number, [number, number, number]][] = [
+  [0.18, [0.66, 0.78, 1.0]], [0.40, [0.96, 0.97, 1.0]], [0.24, [1.0, 0.95, 0.78]], [0.11, [1.0, 0.80, 0.55]], [0.07, [1.0, 0.58, 0.38]],
+];
+export function starColor(u: number): [number, number, number] {
+  let acc = 0;
+  for (const [w, c] of PALETTE) if (u < (acc += w)) return c;
+  return PALETTE[PALETTE.length - 1][1];
+}
+
 function layer(count: number, seed: number, place: (r: () => number) => [number, number, number], size: [number, number]) {
   const r = rng(seed);
-  const pos = new Float32Array(count * 3), s = new Float32Array(count), ph = new Float32Array(count), fq = new Float32Array(count), col = new Float32Array(count * 3);
+  const pos = new Float32Array(count * 3), s = new Float32Array(count), ph = new Float32Array(count), fq = new Float32Array(count), mag = new Float32Array(count), col = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     const p = place(r);
     pos.set(p, i * 3);
-    s[i] = size[0] + r() * (size[1] - size[0]);
+    // few bright stars, many faint ones (like a real deep-sky photo)
+    const m = Math.pow(r(), 3.2);
+    mag[i] = 0.4 + 0.6 * m;
+    s[i] = size[0] + m * (size[1] - size[0]);
     ph[i] = r() * Math.PI * 2;
     fq[i] = 0.3 + r() * 1.2;
-    const tint = r();
-    col.set(tint < 0.2 ? [0.7, 0.8, 1] : tint > 0.85 ? [1, 0.9, 0.75] : [0.96, 0.97, 1], i * 3);
+    col.set(starColor(r()), i * 3);
   }
   const g = new BufferGeometry();
   g.setAttribute("position", new BufferAttribute(pos, 3));
   g.setAttribute("aSize", new BufferAttribute(s, 1));
   g.setAttribute("aPhase", new BufferAttribute(ph, 1));
   g.setAttribute("aFreq", new BufferAttribute(fq, 1));
+  g.setAttribute("aMag", new BufferAttribute(mag, 1));
   g.setAttribute("aColor", new BufferAttribute(col, 3));
   return g;
 }
@@ -74,9 +87,9 @@ export function Stars({ tier }: { tier: Tier }) {
   const parts = useMemo(() => {
     const c = starCounts(tier);
     return [
-      { g: layer(c.far, 1, onSphere(4000), [0.6, 1.2]), m: mat(false, dpr), follow: true },
-      { g: layer(c.bright, 2, onSphere(3800), [3, 5]), m: mat(true, dpr), follow: true },
-      { g: layer(c.mid, 3, inShell(600, 1500), [1, 2.5]), m: mat(false, dpr), follow: false },
+      { g: layer(c.far, 1, onSphere(4000), [1.3, 3.2]), m: mat(false, dpr), follow: true },
+      { g: layer(c.bright, 2, onSphere(3800), [4, 7]), m: mat(true, dpr), follow: true },
+      { g: layer(c.mid, 3, inShell(500, 3500), [1.4, 3.4]), m: mat(false, dpr), follow: false },
     ];
   }, [tier, dpr]);
   useFrame(({ clock }) => {

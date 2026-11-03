@@ -14,6 +14,11 @@ impl WasmLayout {
         let g: SchemaGraph = serde_json::from_str(graph_json).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(WasmLayout { inner: Layout::new(&g, seed) })
     }
+    /// Like `new`, but keeps the given x,y,z positions (NaN = place randomly); used after structure edits.
+    pub fn with_positions(graph_json: &str, seed: u32, init: Vec<f32>) -> Result<WasmLayout, JsError> {
+        let g: SchemaGraph = serde_json::from_str(graph_json).map_err(|e| JsError::new(&e.to_string()))?;
+        Ok(WasmLayout { inner: Layout::with_positions(&g, seed, &init) })
+    }
     pub fn step(&mut self, n: u32) {
         self.inner.step(n);
     }

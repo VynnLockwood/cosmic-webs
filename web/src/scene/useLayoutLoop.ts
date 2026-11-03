@@ -2,6 +2,19 @@ import { useEffect } from "react";
 import { getCore } from "../core/coreClient";
 import { useStore } from "../store/useStore";
 
+const lastPositions = new Map<string, [number, number, number]>();
+
+/** x,y,z per table of `graph` from the previous layout (NaN where the table is new). Exported for tests. */
+export function initialPositions(names: string[], prev: Map<string, [number, number, number]>): Float32Array | undefined {
+  if (!names.some((n) => prev.has(n))) return undefined;
+  const out = new Float32Array(names.length * 3).fill(Number.NaN);
+  names.forEach((n, i) => {
+    const p = prev.get(n);
+    if (p) out.set(p, i * 3);
+  });
+  return out;
+}
+
 /** Steps the WASM force layout in the worker until it settles, publishing positions to the store. */
 export function useLayoutLoop() {
   const graph = useStore((s) => s.graph);
@@ -11,9 +24,11 @@ export function useLayoutLoop() {
     (async () => {
       const core = getCore();
       useStore.getState().setLayoutSettled(false);
-      await core.layoutNew(graph, 1);
+      await core.layoutNew(graph, 1, initialPositions(graph.tables.map((t) => t.name), lastPositions));
       while (!stop) {
-        useStore.getState().setPositions(await core.layoutStep(3));
+        const pos = await core.layoutStep(3);
+        graph.tables.forEach((t, i) => lastPositions.set(t.name, [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]]));
+        useStore.getState().setPositions(pos);
         if (await core.layoutSettled()) {
           useStore.getState().setLayoutSettled(true);
           break;

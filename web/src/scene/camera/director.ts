@@ -39,7 +39,7 @@ export function flyInPose(dot: Vec3, radius: number, cameraPos: Vec3): Pose {
 export function frameSetPose(points: Vec3[], fovDeg: number, viewDir: Vec3 = [0, 0.25, 1]): Pose {
   const n = points.length || 1;
   const c = mul(points.reduce<Vec3>((s, p) => add(s, p), [0, 0, 0]), 1 / n);
-  const r = Math.max(5, ...points.map((p) => len(sub(p, c))));
+  const r = Math.max(40, ...points.map((p) => len(sub(p, c)))); // a lone table is still shown with its neighbours around it
   const dist = (r / Math.sin((fovDeg / 2) * (Math.PI / 180))) * 1.15;
   return { position: add(c, mul(norm(viewDir), dist)), target: c };
 }

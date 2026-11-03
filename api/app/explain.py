@@ -1,5 +1,6 @@
 """EXPLAIN and run helpers: $n parameter translation, SELECT-only guard, error mapping."""
 import re
+import statistics
 
 import psycopg
 from pglast import ast, parse_sql
@@ -43,13 +44,21 @@ def classify(e: Exception) -> tuple[str, str]:
     return "SQL_ERROR", str(e).strip()
 
 
-def explain_query(conn, sql: str, params: list, analyze: bool) -> tuple[float, float, str]:
+def explain_query(conn, sql: str, params: list, analyze: bool, repeat: int = 3) -> tuple[float, float, str, float | None]:
+    """Planner estimate, plus (with analyze) the median measured execution time of `repeat` runs after one warm-up."""
     ensure_select(sql)
     text, vals = to_driver_sql(sql, params)
-    opts = "ANALYZE, FORMAT JSON" if analyze else "FORMAT JSON"
-    row = conn.execute(f"EXPLAIN ({opts}) {text}", vals).fetchone()
-    plan = row[0][0]["Plan"]
-    return float(plan["Total Cost"]), float(plan["Plan Rows"]), f'{plan["Node Type"]} (cost {plan["Total Cost"]:.1f}, rows {plan["Plan Rows"]})'
+    prefix = "EXPLAIN (ANALYZE, FORMAT JSON) " if analyze else "EXPLAIN (FORMAT JSON) "
+    runs = (max(1, repeat) + 1) if analyze else 1
+    times: list[float] = []
+    plan = None
+    for i in range(runs):
+        doc = conn.execute(prefix + text, vals).fetchone()[0][0]
+        plan = doc["Plan"]
+        if analyze and i > 0:  # run 0 warms caches and is discarded
+            times.append(float(doc["Execution Time"]))
+    ms = statistics.median(times) if times else None
+    return float(plan["Total Cost"]), float(plan["Plan Rows"]), f'{plan["Node Type"]} (cost {plan["Total Cost"]:.1f}, rows {plan["Plan Rows"]})', ms
 
 
 def run_query(conn, sql: str, params: list, limit: int) -> tuple[list[str], list[list]]:

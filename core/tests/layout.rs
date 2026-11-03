@@ -112,3 +112,43 @@ fn settles_synthetic500_fixture_under_3s() {
     }
     assert!(t.elapsed().as_secs_f32() < 3.0, "took {:?}", t.elapsed());
 }
+
+#[test]
+fn with_positions_keeps_known_tables_where_they_were_and_randomises_the_rest() {
+    let g = shop();
+    let mut base = Layout::new(&g, 3);
+    base.step(400);
+    let n = g.tables.len();
+    let mut init = base.positions().to_vec();
+    for k in 0..3 {
+        init[(n - 1) * 3 + k] = f32::NAN; // the last table is "new"
+    }
+    let l = Layout::with_positions(&g, 9, &init);
+    assert_eq!(&l.positions()[..(n - 1) * 3], &init[..(n - 1) * 3]);
+    assert!(l.positions()[(n - 1) * 3..].iter().all(|v| v.is_finite()));
+    assert!(l.positions().iter().all(|v| v.abs() <= 1e6));
+}
+
+#[test]
+fn with_positions_reheats_gently_and_settles_sooner_than_a_fresh_layout() {
+    let g = shop();
+    let mut base = Layout::new(&g, 3);
+    base.step(400);
+    let steps = |mut l: Layout| {
+        let mut n = 0;
+        while !l.is_settled() {
+            l.step(1);
+            n += 1;
+        }
+        n
+    };
+    assert!(steps(Layout::with_positions(&g, 3, base.positions())) < steps(Layout::new(&g, 3)));
+}
+
+#[test]
+fn with_positions_ignores_a_short_init_slice() {
+    let g = shop();
+    let l = Layout::with_positions(&g, 3, &[1.0, 2.0, 3.0]);
+    assert_eq!(&l.positions()[..3], &[1.0, 2.0, 3.0]);
+    assert!(l.positions().iter().all(|v| v.is_finite()));
+}

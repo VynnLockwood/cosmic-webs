@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useStore } from "../store/useStore";
+import { ranked } from "../testing/fixtures";
 import type { Candidate, Flag, SchemaGraph } from "../types";
 import { FlagList } from "./FlagList";
 import { ResultsPanel } from "./ResultsPanel";
@@ -10,11 +11,11 @@ const graph: SchemaGraph = { tables: ["public.a", "public.b"].map(t), fks: [fk("
 const cand: Candidate = { id: "c1", shape: "Join", fk_ids: ["f1"], tables: ["public.a", "public.b"], queries: [{ sql: 'SELECT 1 FROM "public"."a"', params: [] }], joins: 1, query_count: 1 };
 
 test("results panel shows ranked cards with chips and sql", () => {
-  useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [cand], costs: { c1: { total_cost: 12.5, plan_rows: 3 } }, results: [{ id: "c1", score: 0, breakdown: { cost: 0, joins: 0, queries: 0, rows: 0 }, reason: "1 query, 1 join" }], flags: [] });
+  useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [cand], costs: { c1: { total_cost: 12.5, plan_rows: 3 } }, results: [ranked("c1", { reason: "1 query, 1 join" })], flags: [] });
   render(<ResultsPanel />);
   expect(screen.getByLabelText("Plan 1")).toBeInTheDocument();
   expect(screen.getByText("1 join")).toBeInTheDocument();
-  expect(screen.getByText("cost 12.5")).toBeInTheDocument();
+  expect(screen.getByText("est. cost 12.5")).toBeInTheDocument();
   expect(screen.getByText(/SELECT 1 FROM/)).toBeInTheDocument();
 });
 
@@ -40,4 +41,41 @@ test("empty results with flags explains itself", () => {
   render(<ResultsPanel />);
   expect(screen.getByText(/No runnable plan/)).toBeInTheDocument();
   expect(screen.getByText("UNREACHABLE")).toBeInTheDocument();
+});
+
+
+import type { Metric } from "../types";
+const mm = (value: number, best: number, worst: number, weight: number): Metric => {
+  const norm = worst > best ? (value - best) / (worst - best) : 0;
+  return { value, best, worst, norm, weight, points: weight * norm };
+};
+const sheet = (id: string, c: number, q: number) => {
+  const detail = { cost: mm(c, 10, 50, 0.5), queries: mm(q, 1, 2, 0.25), joins: mm(1, 1, 1, 0.15), rows: mm(100, 100, 100, 0.1) };
+  const score = detail.cost.points + detail.queries.points;
+  return ranked(id, { score, compared: 3, detail, breakdown: { cost: detail.cost.points, queries: detail.queries.points, joins: 0, rows: 0 } });
+};
+
+test("each card explains its rank with a score sheet that adds up", () => {
+  const c2: Candidate = { ...cand, id: "c2" };
+  useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [cand, c2], results: [sheet("c1", 10, 1), sheet("c2", 30, 2)], flags: [], splitHidden: 0 });
+  render(<ResultsPanel />);
+  const first = screen.getByLabelText("Score sheet for plan 1");
+  expect(first).toHaveTextContent("Estimated cost (planner)");
+  expect(first).toHaveTextContent("Score (lower is better)");
+  expect(screen.getByText(/Best score \(0\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/Behind #1 by/)).toBeInTheDocument();
+});
+
+test("how ranking works lists the weights", () => {
+  render(<ResultsPanel />);
+  const weights = screen.getByLabelText("Ranking weights");
+  expect(weights).toHaveTextContent("50 %");
+  expect(weights).toHaveTextContent("Number of queries");
+  expect(screen.getByText(/plans compared by the planner's estimated cost/)).toBeInTheDocument();
+});
+
+test("hidden split plans are announced", () => {
+  useStore.setState({ splitHidden: 2 });
+  render(<ResultsPanel />);
+  expect(screen.getByText(/2 split plan\(s\) hidden/)).toBeInTheDocument();
 });

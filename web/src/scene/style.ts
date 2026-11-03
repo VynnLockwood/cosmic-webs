@@ -6,7 +6,7 @@ export const COLORS = {
   thread: "#8FA8FF", active: "#BFE4FF", red: "#FF5C6C", amber: "#FFC15C",
 };
 /** World-units scale applied to the spec radius so dots do not overlap the layout's link length. */
-export const DOT_SCALE = 0.35;
+export const DOT_SCALE = 0.5;
 
 export function dotRadius(rowEstimate: number, columnCount: number): number {
   return 2 + 3 * Math.log10((rowEstimate > 0 ? rowEstimate : columnCount) + 1);

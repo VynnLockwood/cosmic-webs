@@ -7,7 +7,7 @@ const vert = /* glsl */ `
 attribute float aPhase; uniform float uTime, uPx; varying float vA;
 void main(){
   vec3 p = position + vec3(sin(uTime*.05+aPhase), cos(uTime*.04+aPhase*1.7), sin(uTime*.03+aPhase*2.3)) * 8.0;
-  vA = 0.05 + 0.05 * fract(aPhase * 7.0);
+  vA = 0.025 + 0.03 * fract(aPhase * 7.0);
   gl_PointSize = 3.0 * uPx;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p,1.0);
 }`;
@@ -20,7 +20,7 @@ export function Dust({ count }: { count: number }) {
     const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
     const pos = new Float32Array(count * 3), ph = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      const rad = 50 + r() * 350, u = r() * 2 - 1, t = r() * Math.PI * 2, k = Math.sqrt(1 - u * u);
+      const rad = 50 + r() * 650, u = r() * 2 - 1, t = r() * Math.PI * 2, k = Math.sqrt(1 - u * u);
       pos.set([Math.cos(t) * k * rad, u * rad, Math.sin(t) * k * rad], i * 3);
       ph[i] = r() * 100;
     }

@@ -52,24 +52,26 @@ All UI text meets WCAG AA on `ui-glass` over the darkest and brightest nebula ar
 
 ## 3. Space layers
 
-### 3.1 Nebula sky sphere
-- Procedural fragment shader on inverted sphere: 3D fBm noise (5 octaves) in world
-  direction space → violet + teal clouds, rose rare.
-- Baked once at load to a 2048² cubemap (render-to-cubemap) for speed; seed is fixed
-  per session so the same angle always shows the same sky.
-- Brightness capped low (max ~18% luminance) so dots always read on top.
+### 3.1 Sky (reference: a deep-sky photograph, e.g. the Crab Nebula)
+- The sky is **black**. No broad coloured fog: only a few compact nebula objects on a near-black void, plus a barely
+  visible cold haze (luminance ≤ 0.03) so gradients never band.
+- Each nebula is a procedural fragment shader: a domain-warped, ridged-noise filament shell (red → orange → amber) around
+  a soft cyan core, with dark gaps between filaments. Four objects at fixed directions (angular radius 0.15–0.30 rad).
+- Baked once to a half-float cubemap (no 8-bit banding) and used as the scene background, so orientation is fixed in the
+  world; orbiting reveals different parts of the sky.
 
-### 3.2 Stars (3 layers)
-| Layer | Count | Size | Behavior |
+### 3.2 Stars (3 layers, colour by temperature)
+| Layer | Count (high) | Size | Behavior |
 |---|---|---|---|
-| Far shell | 6,000 | 0.6–1.2 px | Fixed to sky, slight twinkle |
-| Mid field | 2,500 | 1–2.5 px | Real world positions, parallax |
-| Bright few | 60 | 3–5 px + cross flare | Fixed to sky, slow twinkle |
+| Far shell | 14,000 | 1.3–3.2 px | Fixed to sky, slight twinkle |
+| Mid field | 3,000 | 1.4–3.4 px | Real world positions (r 500–3500), parallax |
+| Bright few | 100 | 4–7 px + cross flare | Fixed to sky, slow twinkle |
 
+Magnitude: few bright, many faint (power law). Colours: blue-white 18 %, white 40 %, pale yellow 24 %, orange 11 %, red 7 %.
 Twinkle: per-star random phase, sine on alpha, 0.3–1.5 Hz, amplitude 25%.
 
 ### 3.3 Dust motes
-- 400 soft particles near the web, very low alpha (5–10%), drift slowly.
+- ~250 very faint particles (alpha 2.5–5.5 %) within r 50–700 of the web, drifting slowly.
 - Give depth when the camera flies through.
 
 ## 4. The web
@@ -188,9 +190,9 @@ Rules:
 
 | Tier | Nebula | Stars | Dust | Bloom | DoF | Grain |
 |---|---|---|---|---|---|---|
-| High | 2048 cubemap | 8,560 | 400 | on | on | on |
-| Medium | 1024 | 4,000 | 150 | on (half-res) | off | off |
-| Low | 512 | 1,500 | 0 | off (glow via sprite only) | off | off |
+| High | 2048 cubemap | 17,100 | 250 | on | on | on |
+| Medium | 1024 | 8,000 | 100 | on (half-res) | off | off |
+| Low | 512 | 3,000 | 0 | off (glow via sprite only) | off | off |
 
 User can override in Settings.
 

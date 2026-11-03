@@ -17,7 +17,7 @@ export function FkChooser({ flag }: { flag: Flag }) {
     const req = { ...s.searchRequest, fk_choices: next };
     s.setSearch(req);
     const out = await runSearch(req);
-    useStore.getState().setResults(out.ranked, out.flags, { candidates: out.candidates, costs: out.costs });
+    useStore.getState().setResults(out.ranked, out.flags, { candidates: out.candidates, costs: out.costs, splitHidden: out.splitHidden });
   };
   return (
     <div style={{ margin: "4px 0 8px 18px" }}>

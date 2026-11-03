@@ -20,11 +20,45 @@ export interface Flag { code: FlagCode; table: string | null; column: string | n
 export interface SqlQuery { sql: string; params: unknown[] }
 export type Shape = "Join" | "SemiJoin" | "Split";
 export interface Candidate { id: string; shape: Shape; fk_ids: string[]; tables: string[]; queries: SqlQuery[]; joins: number; query_count: number }
-export interface ExplainCost { id: string; total_cost: number; plan_rows: number; error?: FlagCode | null }
-export interface ExplainResult { id: string; total_cost: number; plan_rows: number; summary: string; error: { code: string; message: string } | null }
-export interface Ranked { id: string; score: number; breakdown: { cost: number; joins: number; queries: number; rows: number }; reason: string }
+export interface ExplainCost { id: string; total_cost: number; plan_rows: number; exec_ms?: number | null; error?: FlagCode | null }
+export interface ExplainResult { id: string; total_cost: number; plan_rows: number; exec_ms: number | null; summary: string; error: { code: string; message: string } | null }
+export interface Metric { value: number; best: number; worst: number; norm: number; weight: number; points: number }
+export interface RankDetails { cost: Metric; queries: Metric; joins: Metric; rows: Metric }
+export interface Ranked {
+  id: string;
+  score: number;
+  breakdown: { cost: number; joins: number; queries: number; rows: number };
+  reason: string;
+  /** "time" = ranked by measured run time, "cost" = planner estimate */
+  metric: "time" | "cost";
+  /** how many plans were compared */
+  compared: number;
+  detail: RankDetails;
+}
 
 export interface LiveParams { host: string; port: number; dbname: string; user: string; password: string; schema?: string; allow_analyze?: boolean }
 export interface RowsPage { columns: string[]; rows: unknown[][]; total_estimate: number }
 export interface RunResult { columns: string[]; rows: unknown[][]; row_count: number; flags: Flag[] }
 export interface SchemaError { message: string; line: number; col: number }
+
+// ---- structure lab (sandbox-only schema editing) ----
+export interface IndexInfo { schema: string; table: string; name: string; columns: string[]; unique: boolean; primary: boolean; definition: string }
+export type StructureOp =
+  | { kind: "create_index"; table: string; columns: string[]; unique?: boolean }
+  | { kind: "drop_index"; schema: string; name: string }
+  | { kind: "add_fk"; table: string; columns: string[]; ref_table: string; ref_columns: string[]; validate?: boolean }
+  | { kind: "drop_fk"; table: string; name: string }
+  | { kind: "add_column"; table: string; name: string; type: string }
+  | { kind: "drop_column"; table: string; name: string }
+  | { kind: "sql"; statement: string };
+export interface StructureState { graph: SchemaGraph; indexes: IndexInfo[] }
+export type StructureResult = StructureState & { executed: string[] };
+
+/** One row of the before/after comparison: the best plan after a change. */
+export interface Experiment {
+  id: number;
+  label: string;
+  plans: number;
+  best: { id: string; shape: Shape; joins: number; queries: number; value: number; metric: "cost" | "time"; score: number; sql: string } | null;
+  flags: number;
+}

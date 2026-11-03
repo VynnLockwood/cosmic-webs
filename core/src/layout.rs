@@ -57,6 +57,23 @@ impl Layout {
         Layout { n, pos, vel: vec![0.0; n * 3], edges, alpha: 1.0 }
     }
 
+    /// Start from known positions (non-finite or missing entries get random ones) so an edited graph keeps its
+    /// shape instead of flying apart; the simulation is only gently reheated.
+    pub fn with_positions(graph: &SchemaGraph, seed: u32, init: &[f32]) -> Layout {
+        let mut l = Layout::new(graph, seed);
+        let mut kept = 0;
+        for i in 0..l.n {
+            if init.len() >= (i + 1) * 3 && init[i * 3..i * 3 + 3].iter().all(|v| v.is_finite()) {
+                l.pos[i * 3..i * 3 + 3].copy_from_slice(&init[i * 3..i * 3 + 3]);
+                kept += 1;
+            }
+        }
+        if kept > 0 {
+            l.alpha = 0.35;
+        }
+        l
+    }
+
     pub fn positions(&self) -> &[f32] {
         &self.pos
     }

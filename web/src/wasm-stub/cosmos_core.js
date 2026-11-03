@@ -14,6 +14,17 @@ export class WasmLayout {
     this.edges = g.fks.map((f) => [idx.get(f.from.table), idx.get(f.to.table)]).filter(([a, b]) => a !== undefined && b !== undefined && a !== b);
     this.alpha = 1;
   }
+  static with_positions(graphJson, seed, init) {
+    const l = new WasmLayout(graphJson, seed);
+    const n = l.pos.length / 3;
+    let kept = 0;
+    for (let i = 0; i < n; i++) {
+      const p = [init[i * 3], init[i * 3 + 1], init[i * 3 + 2]];
+      if (p.every(Number.isFinite)) { l.pos.set(p, i * 3); kept++; }
+    }
+    if (kept) l.alpha = 0.35;
+    return l;
+  }
   step(k) {
     const n = this.pos.length / 3;
     for (let it = 0; it < k && this.alpha > 0.01; it++, this.alpha *= 0.97) {

@@ -147,3 +147,28 @@ def test_adding_an_index_lowers_the_best_plans_cost_and_time_via_the_real_ranker
     assert after_time["detail"]["cost"]["value"] < before_time["detail"]["cost"]["value"]
     registry.use_sandbox()
     registry.graph = None
+
+
+def test_builder_v2_queries_run_on_postgres(cli, client):
+    """DISTINCT, aggregates, GROUP BY, HAVING, ORDER BY, LIMIT, NOT and the new comparators produce SQL Postgres accepts."""
+    c, graph = client
+    requests = [
+        {"select": ["public.orders.status"], "distinct": True, "order_by": [{"col": "public.orders.status", "dir": "DESC"}], "limit": 3},
+        {"select": ["public.users.email"], "aggregates": [{"func": "COUNT"}, {"func": "SUM", "col": "public.orders.total", "alias": "revenue"}],
+         "having": [{"agg": 0, "cmp": ">=", "value": 1}], "order_by": [{"agg": 1, "dir": "DESC"}], "limit": 5, "offset": 1},
+        {"select": [], "aggregates": [{"func": "COUNT_DISTINCT", "col": "public.orders.user_id"}, {"func": "AVG", "col": "public.orders.total"}], "group_by": ["public.orders.status"]},
+        {"select": ["public.users.email"], "where": {"op": "AND", "children": [
+            {"not": {"col": "public.orders.status", "cmp": "=", "value": 0}},
+            {"col": "public.users.email", "cmp": "NOT ILIKE", "value": "%zzzz%"},
+            {"col": "public.orders.id", "cmp": "NOT BETWEEN", "value": [0, 1]},
+            {"col": "public.users.email", "cmp": "~*", "value": "."}]}, "limit": 5},
+    ]
+    for request in requests:
+        assert [f["code"] for f in call(cli, "diagnose", {"graph": graph, "request": request})] == [], request
+        cands = call(cli, "plan", {"graph": graph, "request": {**request, "fk_choices": {}}})
+        assert cands, request
+        for cand in cands:
+            for q in cand["queries"]:
+                res = c.post("/api/run", json={"query": q, "limit": 50}).json()
+                assert "error" not in res or not res.get("error"), (q["sql"], res)
+                assert res["columns"], q["sql"]

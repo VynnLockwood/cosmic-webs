@@ -63,6 +63,7 @@ impl<'a> Ctx<'a> {
 fn cond_tables(ctx: &Ctx, c: &Cond, out: &mut BTreeSet<usize>) {
     match c {
         Cond::Group { children, .. } => children.iter().for_each(|x| cond_tables(ctx, x, out)),
+        Cond::Not { not } => cond_tables(ctx, not, out),
         Cond::Leaf { col, .. } => {
             out.insert(ctx.tidx(col));
         }
@@ -79,6 +80,7 @@ fn conjuncts(w: &Option<Cond>) -> Vec<Cond> {
 
 fn compile(c: &Cond, alias: &dyn Fn(&str) -> String, params: &mut Vec<Value>, nested: bool) -> String {
     match c {
+        Cond::Not { not } => format!("NOT ({})", compile(not, alias, params, false)),
         Cond::Group { op, children } => {
             if children.len() == 1 {
                 return compile(&children[0], alias, params, nested);
@@ -86,10 +88,23 @@ fn compile(c: &Cond, alias: &dyn Fn(&str) -> String, params: &mut Vec<Value>, ne
             let sep = if *op == BoolOp::And { " AND " } else { " OR " };
             let parts: Vec<String> = children.iter().map(|x| compile(x, alias, params, true)).collect();
             let s = parts.join(sep);
-            if nested { format!("({s})") } else { s }
+            if nested {
+                format!("({s})")
+            } else {
+                s
+            }
         }
         Cond::Leaf { col, cmp, value } => {
             let name = format!("{}.{}", alias(col), q(split_col(col).unwrap().1));
+            compile_cmp(&name, *cmp, value, params)
+        }
+    }
+}
+
+fn compile_cmp(name: &str, cmp: Cmp, value: &Option<Value>, params: &mut Vec<Value>) -> String {
+    {
+        {
+            let cmp = &cmp;
             let mut ph = |v: &Value| {
                 params.push(v.clone());
                 format!("${}", params.len())
@@ -98,10 +113,10 @@ fn compile(c: &Cond, alias: &dyn Fn(&str) -> String, params: &mut Vec<Value>, ne
             match cmp {
                 Cmp::IsNull => format!("{name} IS NULL"),
                 Cmp::IsNotNull => format!("{name} IS NOT NULL"),
-                Cmp::Between => {
+                Cmp::Between | Cmp::NotBetween => {
                     let a = ph(arr.first().unwrap_or(&Value::Null));
                     let b = ph(arr.get(1).unwrap_or(&Value::Null));
-                    format!("{name} BETWEEN {a} AND {b}")
+                    format!("{name} {} {a} AND {b}", if *cmp == Cmp::Between { "BETWEEN" } else { "NOT BETWEEN" })
                 }
                 Cmp::In | Cmp::NotIn => {
                     let list: Vec<String> = arr.iter().map(&mut ph).collect();
@@ -116,6 +131,10 @@ fn compile(c: &Cond, alias: &dyn Fn(&str) -> String, params: &mut Vec<Value>, ne
                         Cmp::Gt => ">",
                         Cmp::Ge => ">=",
                         Cmp::Like => "LIKE",
+                        Cmp::NotLike => "NOT LIKE",
+                        Cmp::NotILike => "NOT ILIKE",
+                        Cmp::Regex => "~",
+                        Cmp::IRegex => "~*",
                         _ => "ILIKE",
                     };
                     let p = ph(value.as_ref().unwrap_or(&Value::Null));
@@ -139,15 +158,58 @@ struct Semi {
     conds: Vec<Cond>,
 }
 
+fn agg_aliases(aggs: &[Aggregate]) -> Vec<String> {
+    let mut out: Vec<String> = vec![];
+    for a in aggs {
+        let f = match a.func {
+            AggFunc::Count => "count",
+            AggFunc::CountDistinct => "count_distinct",
+            AggFunc::Sum => "sum",
+            AggFunc::Avg => "avg",
+            AggFunc::Min => "min",
+            AggFunc::Max => "max",
+        };
+        let base = a.alias.clone().unwrap_or_else(|| match &a.col {
+            Some(c) => format!("{f}_{}", split_col(c).map_or(c.as_str(), |x| x.1)),
+            None => f.to_string(),
+        });
+        let mut name = base.clone();
+        let mut n = 2;
+        while out.contains(&name) {
+            name = format!("{base}_{n}");
+            n += 1;
+        }
+        out.push(name);
+    }
+    out
+}
+
+fn agg_expr(a: &Aggregate, alias_c: &dyn Fn(&str) -> String) -> String {
+    let col = a.col.as_ref().map(|c| format!("{}.{}", alias_c(c), q(split_col(c).unwrap().1)));
+    match (a.func, col) {
+        (AggFunc::Count, None) => "COUNT(*)".to_string(),
+        (AggFunc::Count, Some(c)) => format!("COUNT({c})"),
+        (AggFunc::CountDistinct, Some(c)) => format!("COUNT(DISTINCT {c})"),
+        (f, Some(c)) => format!("{}({c})", format!("{f:?}").to_uppercase()),
+        (_, None) => "COUNT(*)".to_string(),
+    }
+}
+
 /// One SELECT over a connected set of tables.
 #[allow(clippy::too_many_arguments)]
-fn join_query(ctx: &Ctx, root: usize, edges: &[(usize, usize, String)], select: &[String], extra: &[(usize, String)], conds: &[Cond], semis: &[Semi]) -> SqlQuery {
+fn join_query(ctx: &Ctx, root: usize, edges: &[(usize, usize, String)], select: &[String], extra: &[(usize, String)], conds: &[Cond], semis: &[Semi], shape: Option<&SearchRequest>) -> SqlQuery {
     let mut order = vec![root];
     let mut parent_edge: HashMap<usize, String> = HashMap::new();
     let mut q_ = VecDeque::from([root]);
     while let Some(v) = q_.pop_front() {
         for (a, b, id) in edges {
-            let w = if *a == v { *b } else if *b == v { *a } else { continue };
+            let w = if *a == v {
+                *b
+            } else if *b == v {
+                *a
+            } else {
+                continue;
+            };
             if !order.contains(&w) {
                 order.push(w);
                 parent_edge.insert(w, id.clone());
@@ -160,7 +222,11 @@ fn join_query(ctx: &Ctx, root: usize, edges: &[(usize, usize, String)], select: 
     let alias_c = |c: &str| alias_map[&ctx.tidx(c)].clone();
     let mut cols: Vec<String> = select.iter().map(|c| format!("{}.{}", alias_c(c), q(split_col(c).unwrap().1))).collect();
     cols.extend(extra.iter().map(|(t, c)| format!("{}.{}", alias_t(*t), q(c))));
-    let mut sql = format!("SELECT {} FROM {} AS {}", cols.join(", "), qt(&ctx.gr.names[root]), alias_t(root));
+    let none = SearchRequest::default();
+    let sh = shape.unwrap_or(&none);
+    let names = agg_aliases(&sh.aggregates);
+    cols.extend(sh.aggregates.iter().zip(&names).map(|(a, n)| format!("{} AS {}", agg_expr(a, &alias_c), q(n))));
+    let mut sql = format!("SELECT {}{} FROM {} AS {}", if sh.distinct { "DISTINCT " } else { "" }, cols.join(", "), qt(&ctx.gr.names[root]), alias_t(root));
     for t in order.iter().skip(1) {
         sql += &format!(" JOIN {} AS {} ON {}", qt(&ctx.gr.names[*t]), alias_t(*t), on_clause(ctx, &parent_edge[t], &|x| alias_t(x)));
     }
@@ -171,11 +237,58 @@ fn join_query(ctx: &Ctx, root: usize, edges: &[(usize, usize, String)], select: 
         let ea = q(&format!("e{k}"));
         let ealias = |_: &str| ea.clone();
         let inner: Vec<String> = s.conds.iter().map(|c| compile(c, &ealias, &mut params, s.conds.len() > 1)).collect();
-        let link = on_clause(ctx, &s.fk_id, &|x| if x == s.table { ea.clone() } else { alias_t(s.parent) });
+        let link = on_clause(ctx, &s.fk_id, &|x| {
+            if x == s.table {
+                ea.clone()
+            } else {
+                alias_t(s.parent)
+            }
+        });
         parts.push(format!("EXISTS (SELECT 1 FROM {} AS {} WHERE {} AND {})", qt(&ctx.gr.names[s.table]), ea, inner.join(" AND "), link));
     }
     if !parts.is_empty() {
         sql += &format!(" WHERE {}", parts.join(" AND "));
+    }
+    if !sh.aggregates.is_empty() || !sh.group_by.is_empty() {
+        let mut g: Vec<String> = vec![];
+        for c in sh.select.iter().chain(&sh.group_by) {
+            let e = format!("{}.{}", alias_c(c), q(split_col(c).unwrap().1));
+            if !g.contains(&e) {
+                g.push(e);
+            }
+        }
+        if !g.is_empty() {
+            sql += &format!(" GROUP BY {}", g.join(", "));
+        }
+    }
+    if !sh.having.is_empty() {
+        let parts: Vec<String> = sh.having.iter().filter_map(|h| sh.aggregates.get(h.agg).map(|a| compile_cmp(&agg_expr(a, &alias_c), h.cmp, &h.value, &mut params))).collect();
+        if !parts.is_empty() {
+            sql += &format!(" HAVING {}", parts.join(" AND "));
+        }
+    }
+    if !sh.order_by.is_empty() {
+        let parts: Vec<String> = sh
+            .order_by
+            .iter()
+            .filter_map(|o| {
+                let dir = if o.dir == Dir::Desc { "DESC" } else { "ASC" };
+                match (&o.col, o.agg) {
+                    (Some(c), _) => Some(format!("{}.{} {dir}", alias_c(c), q(split_col(c).unwrap().1))),
+                    (None, Some(a)) => names.get(a).map(|n| format!("{} {dir}", q(n))),
+                    _ => None,
+                }
+            })
+            .collect();
+        if !parts.is_empty() {
+            sql += &format!(" ORDER BY {}", parts.join(", "));
+        }
+    }
+    if let Some(n) = sh.limit {
+        sql += &format!(" LIMIT {n}");
+    }
+    if let Some(n) = sh.offset {
+        sql += &format!(" OFFSET {n}");
     }
     SqlQuery { sql, params }
 }
@@ -189,8 +302,11 @@ fn names(ctx: &Ctx, t: &Tree) -> Vec<String> {
 }
 
 pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
-    let r = reachable_request(g, req);
-    if r.select.is_empty() {
+    let mut r = reachable_request(g, req);
+    if r.select.is_empty() && r.aggregates.is_empty() {
+        r.select = r.group_by.clone(); // GROUP BY alone shows the grouped columns
+    }
+    if r.select.is_empty() && r.aggregates.is_empty() {
         return vec![];
     }
     let gr = Graph::new(g);
@@ -199,20 +315,33 @@ pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
     if let Some(w) = &r.where_ {
         leaves(w, &mut leaf_list);
     }
-    let sel_tables: BTreeSet<usize> = r.select.iter().map(|c| ctx.tidx(c)).collect();
+    let sel_tables: BTreeSet<usize> = r.projected_cols().iter().map(|c| ctx.tidx(c)).collect();
     let mut required: Vec<usize> = sel_tables.iter().copied().collect();
     required.extend(leaf_list.iter().map(|(c, _, _)| ctx.tidx(c)));
     required.sort();
     required.dedup();
-    let Ok(trees) = steiner_trees(&gr, &required, &r.fk_choices, MAX_TREES) else { return vec![] };
-    let root = ctx.tidx(&r.select[0]);
+    if required.is_empty() {
+        return vec![];
+    }
+    let Ok(trees) = steiner_trees(&gr, &required, &r.fk_choices, MAX_TREES) else {
+        return vec![];
+    };
+    let root = r.projected_cols().first().map(|c| ctx.tidx(c)).unwrap_or(required[0]);
     let all = conjuncts(&r.where_);
     let mut out: Vec<Candidate> = vec![];
-    let mk = |shape, t: &Tree, queries: Vec<SqlQuery>, joins: u32| Candidate { id: String::new(), shape, fk_ids: t.fk_ids.clone(), tables: names(&ctx, t), query_count: queries.len() as u32, queries, joins };
+    let mk = |shape, t: &Tree, queries: Vec<SqlQuery>, joins: u32| Candidate {
+        id: String::new(),
+        shape,
+        fk_ids: t.fk_ids.clone(),
+        tables: names(&ctx, t),
+        query_count: queries.len() as u32,
+        queries,
+        joins,
+    };
 
     // 1. Join
     for t in &trees {
-        let qy = join_query(&ctx, root, &tree_edges(t), &r.select, &[], &all, &[]);
+        let qy = join_query(&ctx, root, &tree_edges(t), &r.select, &[], &all, &[], Some(&r));
         out.push(mk(Shape::Join, t, vec![qy], t.edges.len() as u32));
     }
     // 2. SemiJoin: filter-only leaf tables become EXISTS
@@ -224,8 +353,19 @@ pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
             if f == root || sel_tables.contains(&f) || nbrs.len() != 1 {
                 continue;
             }
-            let mine: Vec<&Cond> = all.iter().filter(|c| { let mut s = BTreeSet::new(); cond_tables(&ctx, c, &mut s); s.contains(&f) }).collect();
-            let only_f = mine.iter().all(|c| { let mut s = BTreeSet::new(); cond_tables(&ctx, c, &mut s); s.len() == 1 });
+            let mine: Vec<&Cond> = all
+                .iter()
+                .filter(|c| {
+                    let mut s = BTreeSet::new();
+                    cond_tables(&ctx, c, &mut s);
+                    s.contains(&f)
+                })
+                .collect();
+            let only_f = mine.iter().all(|c| {
+                let mut s = BTreeSet::new();
+                cond_tables(&ctx, c, &mut s);
+                s.len() == 1
+            });
             if mine.is_empty() || !only_f {
                 continue;
             }
@@ -238,17 +378,25 @@ pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
             continue;
         }
         let edges: Vec<_> = tree_edges(t).into_iter().filter(|e| !dropped.contains(&e.0) && !dropped.contains(&e.1)).collect();
-        let rest: Vec<Cond> = all.iter().filter(|c| { let mut s = BTreeSet::new(); cond_tables(&ctx, c, &mut s); !(s.len() == 1 && dropped.contains(s.iter().next().unwrap())) }).cloned().collect();
-        let qy = join_query(&ctx, root, &edges, &r.select, &[], &rest, &semis);
+        let rest: Vec<Cond> = all
+            .iter()
+            .filter(|c| {
+                let mut s = BTreeSet::new();
+                cond_tables(&ctx, c, &mut s);
+                !(s.len() == 1 && dropped.contains(s.iter().next().unwrap()))
+            })
+            .cloned()
+            .collect();
+        let qy = join_query(&ctx, root, &edges, &r.select, &[], &rest, &semis, Some(&r));
         out.push(mk(Shape::SemiJoin, t, vec![qy], edges.len() as u32));
     }
     // 3. Split: only when the filter is a pure AND of per-table conjuncts
     let pure_and = match &r.where_ {
         None => true,
-        Some(Cond::Group { op: BoolOp::And, .. }) | Some(Cond::Leaf { .. }) => true,
+        Some(Cond::Group { op: BoolOp::And, .. }) | Some(Cond::Leaf { .. }) | Some(Cond::Not { .. }) => true,
         Some(Cond::Group { .. }) => false,
     };
-    if pure_and {
+    if pure_and && !r.is_shaped() {
         for t in &trees {
             for (ei, &(a, b)) in t.edges.iter().enumerate() {
                 let (ca, cb) = components(&t.edges, ei, a, b);
@@ -261,8 +409,20 @@ pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
                 for comp in [&ca, &cb] {
                     let edges: Vec<_> = tree_edges(t).into_iter().filter(|e| comp.contains(&e.0) && comp.contains(&e.1)).collect();
                     let sel: Vec<String> = r.select.iter().filter(|c| comp.contains(&ctx.tidx(c))).cloned().collect();
-                    let conds: Vec<Cond> = all.iter().filter(|c| { let mut s = BTreeSet::new(); cond_tables(&ctx, c, &mut s); s.iter().all(|x| comp.contains(x)) }).cloned().collect();
-                    let spanning = all.iter().any(|c| { let mut s = BTreeSet::new(); cond_tables(&ctx, c, &mut s); !s.iter().all(|x| ca.contains(x)) && !s.iter().all(|x| cb.contains(x)) });
+                    let conds: Vec<Cond> = all
+                        .iter()
+                        .filter(|c| {
+                            let mut s = BTreeSet::new();
+                            cond_tables(&ctx, c, &mut s);
+                            s.iter().all(|x| comp.contains(x))
+                        })
+                        .cloned()
+                        .collect();
+                    let spanning = all.iter().any(|c| {
+                        let mut s = BTreeSet::new();
+                        cond_tables(&ctx, c, &mut s);
+                        !s.iter().all(|x| ca.contains(x)) && !s.iter().all(|x| cb.contains(x))
+                    });
                     if spanning || sel.is_empty() {
                         ok = false;
                         break;
@@ -271,7 +431,7 @@ pub fn plan_candidates(g: &SchemaGraph, req: &SearchRequest) -> Vec<Candidate> {
                     let ti = ctx.gr.table_index(side_t).unwrap();
                     let extra: Vec<(usize, String)> = side_cols.iter().map(|c| (ti, c.clone())).collect();
                     let r0 = ctx.tidx(&sel[0]);
-                    qs.push(join_query(&ctx, r0, &edges, &sel, &extra, &conds, &[]));
+                    qs.push(join_query(&ctx, r0, &edges, &sel, &extra, &conds, &[], None));
                 }
                 if ok {
                     out.push(mk(Shape::Split, t, qs, t.edges.len() as u32 - 1));

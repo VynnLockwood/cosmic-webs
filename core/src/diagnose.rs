@@ -18,6 +18,7 @@ pub enum FlagCode {
     Permission,
     Timeout,
     EmptyResult,
+    InvalidQuery,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,7 +84,7 @@ fn check_leaf(typ: &str, cmp: Cmp, value: &Option<Value>) -> Option<String> {
     let val = value.as_ref().filter(|v| !v.is_null());
     match cmp {
         Cmp::IsNull | Cmp::IsNotNull => val.map(|_| "IS [NOT] NULL takes no value".to_string()),
-        Cmp::Between => match val.and_then(|v| v.as_array()) {
+        Cmp::Between | Cmp::NotBetween => match val.and_then(|v| v.as_array()) {
             Some(a) if a.len() == 2 && a.iter().all(|x| valid(x, c)) => None,
             _ => Some(format!("BETWEEN needs two {typ} values")),
         },
@@ -91,7 +92,7 @@ fn check_leaf(typ: &str, cmp: Cmp, value: &Option<Value>) -> Option<String> {
             Some(a) if !a.is_empty() && a.iter().all(|x| valid(x, c)) => None,
             _ => Some(format!("IN needs a list of {typ} values")),
         },
-        Cmp::Like | Cmp::ILike => {
+        Cmp::Like | Cmp::ILike | Cmp::NotLike | Cmp::NotILike | Cmp::Regex | Cmp::IRegex => {
             if c != Class::Text {
                 Some(format!("LIKE only works on text columns, not {typ}"))
             } else if val.map_or(true, |v| !v.is_string()) {
@@ -114,7 +115,7 @@ struct Refs {
 }
 
 fn all_cols(req: &SearchRequest) -> Vec<String> {
-    let mut v = req.select.clone();
+    let mut v = req.projected_cols();
     if let Some(w) = &req.where_ {
         let mut ls = vec![];
         leaves(w, &mut ls);
@@ -134,7 +135,7 @@ fn main_island(gr: &Graph, g: &SchemaGraph, req: &SearchRequest) -> Option<BTree
     if tables.is_empty() {
         return None;
     }
-    let first = req.select.iter().find_map(|c| split_col(c).and_then(|(t, _)| gr.table_index(t)));
+    let first = req.projected_cols().iter().find_map(|c| split_col(c).and_then(|(t, _)| gr.table_index(t)));
     let comps = islands(gr);
     let score = |c: &Vec<usize>| {
         let n = tables.iter().collect::<BTreeSet<_>>().iter().filter(|t| c.contains(t)).count();
@@ -161,8 +162,11 @@ pub fn diagnose(g: &SchemaGraph, req: &SearchRequest) -> Vec<Flag> {
             }
         }
     }
+    check_shape(g, req, &mut out);
     let gr = Graph::new(g);
-    let Some(main) = main_island(&gr, g, req) else { return out };
+    let Some(main) = main_island(&gr, g, req) else {
+        return out;
+    };
     let refs = known_refs(g, req);
     let mut dropped: BTreeSet<usize> = BTreeSet::new();
     let mut required: Vec<usize> = vec![];
@@ -177,12 +181,7 @@ pub fn diagnose(g: &SchemaGraph, req: &SearchRequest) -> Vec<Flag> {
     }
     let main_names: Vec<&str> = main.iter().map(|&i| gr.names[i].as_str()).collect();
     for ti in dropped {
-        out.push(flag(
-            FlagCode::Unreachable,
-            Some(&gr.names[ti]),
-            None,
-            format!("{} has no foreign-key path to {}; its columns and filters were dropped", gr.names[ti], main_names.join(", ")),
-        ));
+        out.push(flag(FlagCode::Unreachable, Some(&gr.names[ti]), None, format!("{} has no foreign-key path to {}; its columns and filters were dropped", gr.names[ti], main_names.join(", "))));
     }
     if let Ok(trees) = steiner_trees(&gr, &required, &req.fk_choices, 1) {
         if let Some(t) = trees.first() {
@@ -202,6 +201,7 @@ pub fn diagnose(g: &SchemaGraph, req: &SearchRequest) -> Vec<Flag> {
 fn prune(c: &Cond, keep: &dyn Fn(&str) -> bool) -> Option<Cond> {
     match c {
         Cond::Leaf { col, .. } => keep(col).then(|| c.clone()),
+        Cond::Not { not } => prune(not, keep).map(|x| Cond::Not { not: Box::new(x) }),
         Cond::Group { op, children } => {
             let kids: Vec<Cond> = children.iter().filter_map(|x| prune(x, keep)).collect();
             (!kids.is_empty()).then(|| Cond::Group { op: *op, children: kids })
@@ -213,12 +213,75 @@ fn prune(c: &Cond, keep: &dyn Fn(&str) -> bool) -> Option<Cond> {
 pub fn reachable_request(g: &SchemaGraph, req: &SearchRequest) -> SearchRequest {
     let gr = Graph::new(g);
     let Some(main) = main_island(&gr, g, req) else {
-        return SearchRequest { select: vec![], where_: None, fk_choices: req.fk_choices.clone() };
+        return SearchRequest { fk_choices: req.fk_choices.clone(), ..Default::default() };
     };
     let keep = |c: &str| col_type(g, c).is_some() && split_col(c).and_then(|(t, _)| gr.table_index(t)).map_or(false, |i| main.contains(&i));
+    // aggregates on dropped columns go away; HAVING / ORDER BY that point at them go with them, the rest is re-indexed
+    let kept: Vec<usize> = (0..req.aggregates.len()).filter(|&i| req.aggregates[i].col.as_deref().map_or(true, keep)).collect();
+    let remap = |old: usize| kept.iter().position(|&k| k == old);
     SearchRequest {
         select: req.select.iter().filter(|c| keep(c)).cloned().collect(),
         where_: req.where_.as_ref().and_then(|w| prune(w, &keep)),
         fk_choices: req.fk_choices.clone(),
+        distinct: req.distinct,
+        aggregates: kept.iter().map(|&i| req.aggregates[i].clone()).collect(),
+        group_by: req.group_by.iter().filter(|c| keep(c)).cloned().collect(),
+        having: req.having.iter().filter_map(|h| remap(h.agg).map(|a| Having { agg: a, cmp: h.cmp, value: h.value.clone() })).collect(),
+        order_by: req
+            .order_by
+            .iter()
+            .filter_map(|o| match (&o.col, o.agg) {
+                (Some(c), _) => keep(c).then(|| o.clone()),
+                (None, Some(a)) => remap(a).map(|a| OrderBy { col: None, agg: Some(a), dir: o.dir }),
+                _ => None,
+            })
+            .collect(),
+        limit: req.limit,
+        offset: req.offset,
+    }
+}
+
+fn is_numeric(t: &str) -> bool {
+    matches!(class(t), Class::Int | Class::Num)
+}
+
+/// Combinations Postgres would reject (or that mean nothing); reported before any SQL runs.
+fn check_shape(g: &SchemaGraph, req: &SearchRequest, out: &mut Vec<Flag>) {
+    let bad = |m: String, col: Option<&str>| flag(FlagCode::InvalidQuery, col.and_then(split_col).map(|x| x.0), col, m);
+    for a in &req.aggregates {
+        match (&a.col, a.func) {
+            (None, AggFunc::Count) => {}
+            (None, f) => out.push(bad(format!("{} needs a column (only COUNT can count rows)", format!("{f:?}").to_uppercase()), None)),
+            (Some(c), AggFunc::Sum | AggFunc::Avg) => {
+                if let Some((_, typ)) = col_type(g, c) {
+                    if !is_numeric(typ) {
+                        out.push(bad(format!("{c}: SUM and AVG need a number column, not {typ}"), Some(c)));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if !req.having.is_empty() && req.aggregates.is_empty() {
+        out.push(bad("HAVING needs at least one aggregate".into(), None));
+    }
+    for h in &req.having {
+        if h.agg >= req.aggregates.len() && !req.aggregates.is_empty() {
+            out.push(bad(format!("HAVING points at aggregate #{} which does not exist", h.agg + 1), None));
+        }
+    }
+    let grouped: Vec<&String> = req.select.iter().chain(&req.group_by).collect();
+    for o in &req.order_by {
+        match (&o.col, o.agg) {
+            (Some(c), _) => {
+                if req.distinct && !req.select.contains(c) {
+                    out.push(bad(format!("{c}: with DISTINCT you can only sort by a column you select"), Some(c)));
+                } else if !req.aggregates.is_empty() && !grouped.contains(&c) {
+                    out.push(bad(format!("{c}: with aggregates you can only sort by a grouped column or an aggregate"), Some(c)));
+                }
+            }
+            (None, Some(a)) if a >= req.aggregates.len() => out.push(bad(format!("ORDER BY points at aggregate #{} which does not exist", a + 1), None)),
+            _ => {}
+        }
     }
 }

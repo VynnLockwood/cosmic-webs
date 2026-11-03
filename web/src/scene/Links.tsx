@@ -30,7 +30,7 @@ export function Links() {
   const c = useMemo(() => new Color(), []);
 
   useFrame(({ clock }) => {
-    const { positions, hoveredTable, selectedTable, linkOverrides, reducedMotion } = useStore.getState();
+    const { positions, hoveredTable, selectedTable, linkOverrides, reducedMotion, visual } = useStore.getState();
     const pulses = !E2E && !reducedMotion;
     if (positions.length !== graph.tables.length * 3) return;
     const pos = geo.getAttribute("position") as BufferAttribute;
@@ -43,7 +43,7 @@ export function Links() {
       const names = [graph.tables[l.a].name, graph.tables[l.b].name];
       const state: LinkState = linkOverrides[l.id] ?? (focus.some((f) => names.includes(f)) ? "neighbor" : "idle");
       const st = linkStyle(state);
-      c.set(st.color).multiplyScalar(st.opacity * motion.linkFade);
+      c.set(st.color).multiplyScalar(st.opacity * motion.linkFade * visual.webLine);
       const k = motion.bang;
       const pa = [positions[l.a * 3] * k, positions[l.a * 3 + 1] * k, positions[l.a * 3 + 2] * k];
       const put = (p: number[], boost = 0) => { pos.setXYZ(v, p[0], p[1], p[2]); col.setXYZ(v, c.r * (1 + 2.5 * boost), c.g * (1 + 2.5 * boost), c.b * (1 + 2.5 * boost)); v++; };

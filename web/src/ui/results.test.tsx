@@ -11,6 +11,7 @@ const graph: SchemaGraph = { tables: ["public.a", "public.b"].map(t), fks: [fk("
 const cand: Candidate = { id: "c1", shape: "Join", fk_ids: ["f1"], tables: ["public.a", "public.b"], queries: [{ sql: 'SELECT 1 FROM "public"."a"', params: [] }], joins: 1, query_count: 1 };
 
 test("results panel shows ranked cards with chips and sql", () => {
+  useStore.setState({ sqlMode: "params" });
   useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [cand], costs: { c1: { total_cost: 12.5, plan_rows: 3 } }, results: [ranked("c1", { reason: "1 query, 1 join" })], flags: [] });
   render(<ResultsPanel />);
   expect(screen.getByLabelText("Plan 1")).toBeInTheDocument();
@@ -78,4 +79,21 @@ test("hidden split plans are announced", () => {
   useStore.setState({ splitHidden: 2 });
   render(<ResultsPanel />);
   expect(screen.getByText(/2 split plan\(s\) hidden/)).toBeInTheDocument();
+});
+
+test("SQL can be shown with $1 params or with the values written in, and Copy follows the choice", () => {
+  const withParam: Candidate = { ...cand, queries: [{ sql: 'SELECT 1 FROM "public"."a" AS "t0" WHERE "t0"."x" = $1', params: ["BigLot 'x'"] }] };
+  useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [withParam], results: [ranked("c1", {})], flags: [], sqlMode: "hardcoded" });
+  const copied: string[] = [];
+  Object.assign(navigator, { clipboard: { writeText: (t: string) => copied.push(t) } });
+  render(<ResultsPanel />);
+  expect(screen.getByText(/WHERE "t0"."x" = 'BigLot ''x'''/)).toBeInTheDocument();
+  expect(screen.queryByText(/params:/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  expect(copied.at(-1)).toContain("= 'BigLot ''x'''");
+  fireEvent.click(screen.getByRole("button", { name: "Params ($1)" }));
+  expect(useStore.getState().sqlMode).toBe("params");
+  expect(screen.getByText(/WHERE "t0"."x" = \$1/)).toBeInTheDocument();
+  expect(screen.getByText(/params:/)).toBeInTheDocument();
+  expect(localStorage.getItem("cosmos.sqlMode")).toBe("params");
 });

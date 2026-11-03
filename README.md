@@ -1,8 +1,40 @@
 # Cosmic Webs
 
-Look at a Postgres schema as a **cosmic web**: every table is a glowing dot, every foreign key a thread between
-dots, floating in deep space you can orbit and fly through. Pick columns and conditions from anywhere in the
-schema and Cosmic Webs finds the **top 5 ranked SQL plans** that fetch them — and flags what can't be reached, and why.
+See a Postgres schema as a night sky. Every table is a **star**, every foreign key a **constellation line**.
+Pick columns and conditions from anywhere in the schema and Cosmic Webs finds the **five best SQL plans** that fetch
+them, ranks them by real run time, and tells you what could not be reached and why.
+
+- **3D view** you can orbit, fly into, and search by name (`Ctrl/⌘ K`).
+- **Search builder** with `AND`/`OR`/`NOT`, 18 comparators, `DISTINCT`, `ORDER BY`, `LIMIT`, `GROUP BY`, aggregates and `HAVING`.
+- **Ranking you can read**: every plan has a score sheet that shows why it is #1.
+- **Structure lab**: add an index or a link, see if the best plan got faster, export the result.
+- **Your data**: upload a `pg_dump` / pgAdmin export (rows included), or connect to a live Postgres read-only.
+
+## Architecture
+
+![Cosmic Webs architecture: the browser holds the React and three.js view and a Rust core compiled to WebAssembly; requests go over HTTPS through nginx to a FastAPI service, which runs SQL on the sandbox Postgres and, optionally, your live Postgres through read-only roles.](docs/architecture.svg)
+
+The diagram source is [`docs/architecture.html`](docs/architecture.html) (open it for the web fonts).
+
+| Part | Where it runs | Does what |
+|---|---|---|
+| **React + three.js** (`web/`) | browser | the 3D scene, panels, search builder, results, structure lab |
+| **Rust core** (`core/`) | browser, in a Web Worker, compiled to WASM | force layout, join paths (Steiner trees over the FK graph), candidate SQL, diagnosis flags, ranking |
+| **nginx** (`nginx/`) | server | one entry point: `/api` → FastAPI, everything else → the web files (gzip, long cache for hashed assets) |
+| **FastAPI** (`api/`) | server | DDL parsing (`pglast`), import jobs, mock data, `EXPLAIN` and run, structure lab, export |
+| **Sandbox Postgres** | server | your dump (or generated rows) in a throwaway database |
+| **Your Postgres** | optional | connected read-only; never edited |
+
+### What happens when you press Search
+
+1. The Rust core **diagnoses** the request (unknown column, type mismatch, no foreign-key path, ambiguous links, invalid combinations).
+2. It **plans** up to 20 candidate queries: one join, joins with `EXISTS` for filter-only tables, and split plans.
+3. The API runs **`EXPLAIN`** on each candidate (in the sandbox it also times real runs: median of 3 after a warm-up).
+4. The Rust core **ranks** them: run time (or estimated cost on a live database) 50 %, queries 25 %, joins 15 %, rows 10 %.
+5. You see the top five, each with its SQL, a score sheet, flags, and a **Run** button.
+
+When part of a request has no foreign-key path, the Results panel shows **BEFORE** (your request as SQL, dropped parts struck through)
+above **AFTER** (the SQL of the best plan that ran).
 
 ## Run it
 
@@ -10,50 +42,67 @@ schema and Cosmic Webs finds the **top 5 ranked SQL plans** that fetch them — 
 docker compose up --build      # http://localhost
 ```
 
-Services: `nginx` (reverse proxy) → `web` (Vite + React + TypeScript, Rust math compiled to WASM) and `api` (FastAPI),
-plus `sandbox-pg` (Postgres 16 with generated mock data). The default 25-table shop schema loads on start.
+Services: `nginx` → `web` (Vite build served by nginx, Rust math as WASM) and `api` (FastAPI), plus `sandbox-pg` (Postgres 16).
+The default 25-table shop schema loads on start with a live progress bar.
 
-- **Schema** (left rail): upload a `.sql` file or paste DDL → every table becomes a dot, every FK a link.
-- **Data source**: *Sandbox* (mock data, default) or *Live Postgres* (read-only, 5 s statement timeout, password kept only in API memory).
-- **Click a dot**: the camera flies in; the panel shows columns (PK/FK) and paged rows. `Esc` flies back.
-- **Search**: pick columns (multi-select over the whole schema) and AND/OR conditions (`= != < <= > >= IN NOT IN LIKE ILIKE IS NULL IS NOT NULL BETWEEN`).
-  The Rust core finds join paths (Steiner trees over the FK graph), builds up to 20 candidate queries (join / EXISTS / split),
-  the API runs `EXPLAIN` on each, and the best 5 are shown with SQL, joins, queries and cost.
-  Unreachable tables, ambiguous FKs, type mismatches, timeouts and permission errors are flagged.
+## Using it
 
-- **Why is plan #1 first?** Every result card has a *Why #n?* score sheet: the four things compared (run time or estimated cost 50 %,
-  queries 25 %, joins 15 %, rows 10 %), where the plan sits between the best and worst of the compared plans, and the points each adds.
-  In the sandbox every plan is really executed (median of 3 timed runs after a warm-up), so the rank follows measured run time; on a live
-  database it follows the planner's estimate. Split plans return separate result sets, so they are hidden unless you include them.
-- **Structure lab** (sandbox only): add or drop indexes, links (FKs) and columns, run one DDL statement, or change the data size
-  (up to 100,000 rows per table). The web updates in place, your search re-runs, and a *Before / after* table shows how the best plan changed.
-- **Import**: pgAdmin / `pg_dump` exports work as they are (`\restrict` lines, owners, sequences and grants are skipped). When the file contains rows
-  (`COPY` blocks) they are loaded as they are — empty tables stay empty; otherwise mock rows are generated. Tables or statements that fail are
-  skipped and reported, never leaving the sandbox half-built.
-- **Suggested links**: many databases declare few foreign keys. Columns named like another table (`sppProject`, `customer_id`) are suggested as links; with
-  real rows each suggestion shows how many of its values exist in the target key (`✓ 289/289 values match`), and one click declares it in the sandbox.
+| | |
+|---|---|
+| **Schema** | Upload a `.sql` file or paste DDL. The graph appears at once; rows load in the background with a progress bar. |
+| **Data source** | *Sandbox* (default) or *Live Postgres* (read-only, 5 s statement timeout, password kept only in API memory). |
+| **Click a star** | The camera flies in; the panel shows columns (PK/FK) and paged rows. `Esc` flies back. |
+| **Search** | Pick columns, add conditions, shape the result. Every column box is a search box; a value box lists the values the column really holds, with counts. |
+| **Results** | Top five plans. Switch **SQL** between *Hardcoded values* (paste into pgAdmin and it runs) and *Params ($1)* (for application code). |
+| **Structure lab** | Indexes, links, columns, data size, one raw DDL statement; *Before / after* table; **Export** (see below). |
+| **Settings** | Star size, star brightness, web line brightness, spin sensitivity (saved in this browser), quality, reduced motion. |
 
-Keys: drag = rotate · right-drag = pan · wheel = zoom · `/` search · `Esc` back · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
+Keys: drag = rotate · right-drag = pan · wheel = zoom · `Ctrl/⌘ K` find a table · `/` search · `Esc` back or close · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
+Side panels can be dragged wider or narrower (double-click the handle to reset).
 
-## What the search can do
-
-Pick columns, add conditions, and shape the result. The planner finds the join paths, writes the candidate SQL and ranks the best five.
+### What the search can do
 
 - **Conditions:** `AND` / `OR` groups, `NOT (…)` on any group, `= != < <= > >=`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `LIKE`, `ILIKE`, `NOT LIKE`, `NOT ILIKE`, `~`, `~*`, `IS NULL`, `IS NOT NULL`.
-- **Shape:** `DISTINCT`, `ORDER BY` (columns or aggregates, ASC/DESC), `LIMIT`, `OFFSET`, `GROUP BY`, aggregates (`COUNT`, `COUNT DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`) and `HAVING`. Combinations Postgres would reject are flagged as `INVALID_QUERY` before anything runs.
-- **Pickers:** every column box is a search box. A condition's value box lists the values the column really holds (most frequent first, with counts) and narrows as you type.
-- **Find a table:** press `Ctrl/⌘ K`, type part of a table or column name. Matching dots light up, `Enter` flies there.
-- **Importing:** a schema upload returns the parsed graph at once and loads rows in the background with a live progress bar (`POST /api/schema/jobs`, poll `GET /api/jobs/{id}`).
+- **Shape:** `DISTINCT`, `ORDER BY` (columns or aggregates, ASC/DESC), `LIMIT`, `OFFSET`, `GROUP BY`, `COUNT`, `COUNT DISTINCT`, `SUM`, `AVG`, `MIN`, `MAX`, `HAVING`.
+  Combinations Postgres would reject are flagged `INVALID_QUERY` before anything runs.
+- **Flags:** `UNREACHABLE`, `AMBIGUOUS_FK`, `TYPE_MISMATCH`, `UNKNOWN_COLUMN`, `INVALID_QUERY`, `PERMISSION`, `TIMEOUT`, `EMPTY_RESULT`.
 
-## Layout
+### Import and suggested links
+
+pgAdmin / `pg_dump` exports work as they are (`\restrict` lines, owners, sequences and grants are skipped). When the file has rows (`COPY` blocks) they are
+loaded as they are and empty tables stay empty; otherwise mock rows are generated. Tables or statements that fail are skipped and reported, never
+leaving the sandbox half-built. Many databases declare few foreign keys, so columns named like another table (`sppProject`, `customer_id`) are suggested as
+links; with real rows each suggestion shows how many values exist in the target key (`✓ 289/289 values match`).
+
+### Structure lab and export
+
+Change the sandbox live; the web updates in place, your search re-runs, and *Before / after* compares the best plan with the baseline.
+**Export** gives you four files: the current structure (`.sql`, via `pg_dump`), structure plus data, a **changes script** with only the statements you ran
+(to apply to your real database), and the before/after table as `.csv`.
+
+## API
+
+| Method and path | Purpose |
+|---|---|
+| `POST /api/schema/jobs` · `GET /api/jobs/{id}` | import a schema in the background; poll progress |
+| `POST /api/schema` · `GET /api/schema/default` | import in one request (no progress) |
+| `GET/POST/DELETE /api/source…` | sandbox or live source |
+| `GET /api/tables/{t}/rows` · `…/columns/{c}/values` | paged rows; distinct values with counts for autocomplete |
+| `POST /api/explain` · `POST /api/run` | `EXPLAIN` (optionally timed) and run a candidate query |
+| `GET /api/relations/suggest` | suggested foreign keys, checked against rows |
+| `GET /api/structure` · `POST /api/structure/apply` · `POST /api/sandbox/refill` | structure lab |
+| `GET /api/structure/export?kind=schema\|full` | download the sandbox as `.sql` |
+
+## Repository
 
 | Path | What |
 |---|---|
-| `core/` | Rust crate `cosmos-core`: force layout, join paths, SQL generation, diagnosis, ranking (WASM via `wasm-pack`) |
-| `api/` | FastAPI: DDL parsing (`pglast`), sandbox + mock data, live source, rows, `EXPLAIN`/run |
-| `web/` | Vite + React + TS + react-three-fiber: scene, camera motion, UI, search |
+| `core/` | Rust crate `cosmos-core` (WASM via `wasm-pack`), plus a native CLI used by contract tests |
+| `api/` | FastAPI service |
+| `web/` | Vite + React + TypeScript + react-three-fiber |
+| `nginx/` | reverse proxy configs |
 | `samples/` | `shop.sql` (default schema), fixtures, 500-table synthetic schema |
-| `docs/superpowers/` | design spec, visual design spec, implementation plan |
+| `docs/` | architecture diagram; `docs/superpowers/` holds the design specs and plans |
 
 ## Develop
 
@@ -67,12 +116,19 @@ cd core && cargo test --release
 
 ### Testing notes
 
-- `web/src/wasm-stub` is a small JS stand-in for the WASM package. Unit tests and `VITE_USE_STUB=1` builds use it, so the
-  UI can be developed and tested without wasm32 tooling. Real WASM is used by the Docker build and the `WASM_REAL=1` browser tests.
-- `api/tests/test_contract_rust.py` runs the real Rust planner/ranker (via `core/examples/cli.rs`) against the API and a real
-  Postgres, so the Rust ↔ Python JSON contract is checked without a browser.
-- Browser tests mock the API unless `E2E_REAL_API=1`. Visual baselines are recorded with the stub layout on Linux/SwiftShader.
+- `web/src/wasm-stub` is a small JS stand-in for the WASM package. Unit tests and `VITE_USE_STUB=1` builds use it, so the UI can be developed without wasm32 tooling. Real WASM is used by the Docker build and the `WASM_REAL=1` browser tests.
+- `api/tests/test_contract_rust.py` runs the real Rust planner and ranker (via `core/examples/cli.rs`) against the API and a real Postgres, so the Rust ↔ Python JSON contract is checked without a browser.
+- Browser tests mock the API unless `E2E_REAL_API=1`. Visual baselines use the stub layout on Linux/SwiftShader; re-record with `--update-snapshots=all`.
 - Performance targets (500 tables ≥ 50 fps, layout < 3 s): the layout budget is a Rust test; the fps check runs with `PERF=1` on a machine with a GPU.
-- The sandbox login is a Postgres superuser only for building tables and filling data. User-supplied DDL runs as `cosmos_ddl` and every
-  user-supplied SELECT as the read-only `cosmos_ro`, so neither can read server files.
 - Set `CHROMIUM_PATH` to use a specific Chromium for Playwright.
+
+### Security
+
+The sandbox login is a Postgres superuser only for building tables and filling data. User-supplied DDL runs as `cosmos_ddl` (not a superuser) and every
+user-supplied `SELECT` as the read-only `cosmos_ro`, so neither can read server files. Live connections are read-only with a statement timeout. SQL shown with
+hardcoded values is for copying only; plans always run with bind parameters.
+
+### Editing the architecture diagram
+
+The diagram was made with the [diagram-design](https://github.com/cathrynlavery/diagram-design) skill (`npx skills add cathrynlavery/diagram-design`),
+architecture type, default light skin. Edit `docs/architecture.html`, then export the SVG with the skill's `scripts/export_svg.py`.

@@ -83,3 +83,11 @@ test("the schema panel points to suggested links after a load", () => {
   fireEvent.click(screen.getByRole("button", { name: "Review in Structure lab" }));
   expect(useStore.getState().drawer).toBe("structure");
 });
+
+test("the drawer has a close button and the rail shows a caption under each icon", () => {
+  useStore.setState({ drawer: "schema" });
+  render(<><Rail /><Drawer /></>);
+  expect(screen.getByText("Source")).toBeInTheDocument(); // caption of "Data source"
+  fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
+  expect(useStore.getState().drawer).toBeNull();
+});

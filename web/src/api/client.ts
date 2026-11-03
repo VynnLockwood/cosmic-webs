@@ -17,7 +17,14 @@ async function call<T>(method: string, url: string, body?: unknown): Promise<T> 
   return json as T;
 }
 
+async function text(url: string): Promise<string> {
+  const res = await fetch("/api" + url);
+  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})));
+  return res.text();
+}
+
 export const api = {
+  exportStructure: (kind: "schema" | "full") => text(`/structure/export?kind=${kind}`),
   getDefaultSchema: () => call<ParseResult>("GET", "/schema/default"),
   postSchema: (ddl: string, useDumpData = true) => call<ParseResult>("POST", "/schema", { ddl, use_dump_data: useDumpData }),
   startSchemaJob: (ddl: string | null, useDumpData = true) =>

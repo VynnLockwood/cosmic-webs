@@ -105,7 +105,7 @@ export async function applyStructure(ops: StructureOp[], deps: Deps = real): Pro
     ensureBaseline();
     const res = await deps.api.applyStructure(ops);
     useStore.getState().replaceGraph(res.graph);
-    set({ indexes: res.indexes, lastExecuted: res.executed });
+    set({ indexes: res.indexes, lastExecuted: res.executed, changeLog: [...useStore.getState().changeLog, { label: labelFor(ops), sql: res.executed }] });
     await loadSuggestions(deps);
     await rerunAndRecord(labelFor(ops), deps);
     return true;
@@ -124,7 +124,7 @@ export async function refillData(rows: number, deps: Deps = real): Promise<boole
     ensureBaseline();
     const res = await deps.api.refill(rows);
     useStore.getState().replaceGraph(res.graph);
-    set({ indexes: res.indexes, lastExecuted: [] });
+    set({ indexes: res.indexes, lastExecuted: [], changeLog: [...useStore.getState().changeLog, { label: `Data: ${rows.toLocaleString("en-US")} rows per table`, sql: [] }] });
     await loadSuggestions(deps);
     await rerunAndRecord(`Data: ${rows.toLocaleString("en-US")} rows per table`, deps);
     return true;

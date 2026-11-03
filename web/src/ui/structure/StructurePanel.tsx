@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { applyStructure, deltaPct, loadStructure, refillData } from "../../store/structureActions";
 import { useStore } from "../../store/useStore";
 import type { StructureOp } from "../../types";
+import { Fold } from "../Fold";
+import { ExportSection } from "./ExportSection";
 import { SuggestedLinks } from "./SuggestedLinks";
 
 const short = (t: string) => t.replace(/^public\./, "");
@@ -25,7 +27,6 @@ function IndexSection({ run, busy }: { run: Run; busy: boolean }) {
   const toggle = (c: string) => setCols(cols.includes(c) ? cols.filter((x) => x !== c) : [...cols, c]);
   return (
     <section aria-label="Indexes">
-      <h3>Indexes</h3>
       <div>
         {indexes.map((i) => (
           <span key={`${i.schema}.${i.name}`} className="chip mono" title={i.definition}>
@@ -69,7 +70,6 @@ function FkSection({ run, busy }: { run: Run; busy: boolean }) {
   const bc = b?.columns.find((c) => c.name === toCol) ?? b?.columns.find((c) => c.pk) ?? b?.columns[0];
   return (
     <section aria-label="Foreign keys">
-      <h3>Foreign keys (links)</h3>
       <div>
         {fks.map((f) => (
           <span key={f.id} className="chip mono">
@@ -105,7 +105,6 @@ function ColumnSection({ run, busy }: { run: Run; busy: boolean }) {
   const dropCol = t?.columns.find((c) => c.name === drop) ?? t?.columns[0];
   return (
     <section aria-label="Columns">
-      <h3>Columns</h3>
       <div className="row">
         <select aria-label="Column table" value={t?.name ?? ""} onChange={(e) => { setTable(e.target.value); setDrop(""); }}>{tables.map((x) => <option key={x.name} value={x.name}>{short(x.name)}</option>)}</select>
       </div>
@@ -127,7 +126,6 @@ function DataSection({ busy }: { busy: boolean }) {
   const rows = tables.length ? Math.max(...tables.map((t) => t.row_estimate)) : 0;
   return (
     <section aria-label="Data size">
-      <h3>Data size</h3>
       <p style={{ margin: "0 0 6px", color: "var(--ui-muted)" }}>Now about {rows.toLocaleString("en-US")} rows per table. Indexes only pay off on bigger tables — try 50,000 or more.</p>
       <div className="row" style={{ flexWrap: "wrap" }}>
         {SIZES.map((n) => <button key={n} className="btn ghost" disabled={busy} onClick={() => refillData(n)}>{n.toLocaleString("en-US")} rows</button>)}
@@ -139,12 +137,11 @@ function DataSection({ busy }: { busy: boolean }) {
 function RawSection({ run, busy }: { run: Run; busy: boolean }) {
   const [sql, setSql] = useState("");
   return (
-    <details>
-      <summary style={{ cursor: "pointer", color: "var(--active)" }}>Advanced: run one DDL statement</summary>
+    <div>
       <textarea aria-label="DDL statement" value={sql} onChange={(e) => setSql(e.target.value)} placeholder="CREATE INDEX ON orders (created_at DESC);" spellCheck={false} style={{ minHeight: 70 }} />
       <p style={{ color: "var(--ui-muted)", fontSize: 12, margin: "4px 0" }}>CREATE INDEX, ALTER TABLE, CREATE TABLE, DROP INDEX, DROP TABLE. Runs without superuser rights.</p>
       <button className="btn" disabled={busy || !sql.trim()} onClick={() => run([{ kind: "sql", statement: sql }]).then((ok) => ok && setSql(""))}>Run</button>
-    </details>
+    </div>
   );
 }
 
@@ -157,7 +154,6 @@ function ExperimentsSection() {
   const base = experiments[0];
   return (
     <section aria-label="Experiments">
-      <h3>Before / after</h3>
       {experiments.length === 0 && (
         <p style={{ margin: 0, color: "var(--ui-muted)" }}>
           {hasSearch ? "Make a change: the search re-runs and the best plan is compared here." : "Run a search first (Search → Search), then change the structure to see whether it gets faster."}
@@ -194,6 +190,10 @@ export function StructurePanel() {
   const busy = useStore((s) => s.structureBusy);
   const error = useStore((s) => s.structureError);
   const executed = useStore((s) => s.lastExecuted);
+  const experiments = useStore((s) => s.experiments);
+  const indexes = useStore((s) => s.indexes);
+  const fks = useStore((s) => s.graph?.fks.length ?? 0);
+  const changes = useStore((s) => s.changeLog.length);
   const run: Run = (ops) => applyStructure(ops);
   useEffect(() => {
     if (mode === "sandbox") void loadStructure();
@@ -211,17 +211,21 @@ export function StructurePanel() {
   return (
     <>
       <h2>Structure lab</h2>
-      <p style={{ margin: "0 0 4px", color: "var(--ui-muted)" }}>Change the sandbox database live. The web updates, your search re-runs, and the table below shows whether the best plan got faster.</p>
+      <p style={{ margin: "0 0 4px", color: "var(--ui-muted)" }}>Change the sandbox database live. The web updates, your search re-runs, and the Before / after table shows whether the best plan got faster.</p>
+      <ol className="steps" aria-label="How it works">
+        <li>Run a search</li><li>Change the structure</li><li>Read Before / after</li><li>Export what worked</li>
+      </ol>
       {busy && <div role="status" style={{ color: "var(--active)" }}>Applying…</div>}
       {error && <div className="err" role="alert">{error}</div>}
       {executed.length > 0 && <pre className="mono" style={{ whiteSpace: "pre-wrap", margin: "6px 0", color: "var(--ui-muted)" }} aria-label="Executed SQL">{executed.join(";\n")}</pre>}
-      <ExperimentsSection />
+      <Fold title="Before / after" hint="did it get faster?" badge={experiments.length || undefined} defaultOpen><ExperimentsSection /></Fold>
       <SuggestedLinks canAdd />
-      <IndexSection run={run} busy={busy} />
-      <FkSection run={run} busy={busy} />
-      <ColumnSection run={run} busy={busy} />
-      <DataSection busy={busy} />
-      <RawSection run={run} busy={busy} />
+      <Fold title="Indexes" hint="speed up lookups" badge={indexes.length} defaultOpen><IndexSection run={run} busy={busy} /></Fold>
+      <Fold title="Foreign keys" hint="links between tables" badge={fks}><FkSection run={run} busy={busy} /></Fold>
+      <Fold title="Columns" hint="add or drop"><ColumnSection run={run} busy={busy} /></Fold>
+      <Fold title="Data size" hint="how many mock rows"><DataSection busy={busy} /></Fold>
+      <Fold title="Export" hint="structure, data, changes" badge={changes || undefined}><ExportSection /></Fold>
+      <Fold title="Advanced" hint="run one DDL statement"><RawSection run={run} busy={busy} /></Fold>
     </>
   );
 }

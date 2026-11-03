@@ -1,4 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { useStore } from "../store/useStore";
 import { expect, test } from "vitest";
 import { AskedVsRan } from "./AskedVsRan";
 import type { Candidate, Flag, SearchRequest } from "../types";
@@ -27,4 +28,12 @@ test("nothing is shown when nothing was dropped", () => {
 test("with no runnable plan it says so", () => {
   render(<AskedVsRan req={req} flags={[flag]} top={null} />);
   expect(screen.getByText(/Nothing runnable was left/)).toBeInTheDocument();
+});
+
+test("an unlinked table offers a button that opens Search with an empty join row", () => {
+  useStore.setState({ searchJoins: [], drawer: null });
+  render(<AskedVsRan req={req} flags={[flag]} top={cand} />);
+  fireEvent.click(screen.getByRole("button", { name: "Add a join" }));
+  expect(useStore.getState().drawer).toBe("search");
+  expect(useStore.getState().searchJoins).toEqual([{ from: "", to: "" }]);
 });

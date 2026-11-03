@@ -5,6 +5,8 @@ import { sqlFor } from "../search/sqlText";
 import { useStore } from "../store/useStore";
 import { WhyThisRank } from "./RankExplainer";
 
+const RUN_LIMIT = 200;
+
 interface Props { rank: number; r: Ranked; cand: Candidate; cost?: number; first?: Ranked; next?: Ranked; onHover(id: string | null): void }
 
 export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props) {
@@ -15,7 +17,7 @@ export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props)
   const run = async () => {
     setErr(null);
     try {
-      setRuns(await Promise.all(cand.queries.map((q) => api.run(q, 20))));
+      setRuns(await Promise.all(cand.queries.map((q) => api.run(q, RUN_LIMIT))));
     } catch (e: any) {
       setErr(String(e?.body?.message ?? e?.message ?? e));
     }
@@ -47,11 +49,17 @@ export function ResultCard({ rank, r, cand, cost, first, next, onHover }: Props)
       {err && <div className="err" role="alert">{err}</div>}
       {runs?.map((res, i) => (
         <div key={i}>
-          <div className="row"><span className="badge">{res.row_count} rows</span>{res.flags.map((f) => <span key={f.code} className="badge" style={{ color: "var(--amber)" }}>{f.code}</span>)}</div>
+          <div className="row">
+            <span className="badge">{res.row_count} rows</span>
+            {res.truncated && <span className="badge" style={{ color: "var(--amber)" }}>first {res.row_count} rows shown, there are more</span>}
+            {res.flags.map((f) => <span key={f.code} className="badge" style={{ color: "var(--amber)" }}>{f.code}</span>)}
+          </div>
           {res.rows.length > 0 && (
-            <div style={{ overflow: "auto" }}>
-              <table className="grid"><thead><tr>{res.columns.map((c, k) => <th key={k}>{c}</th>)}</tr></thead>
-                <tbody>{res.rows.slice(0, 5).map((row, a) => <tr key={a}>{row.map((v, b) => <td key={b}>{v === null ? "null" : String(v)}</td>)}</tr>)}</tbody></table>
+            <div aria-label="Query result rows" style={{ overflow: "auto", maxHeight: 340, border: "1px solid var(--border)", borderRadius: 8 }}>
+              <table className="grid sticky-head">
+                <thead><tr>{res.columns.map((c, k) => <th key={k}>{c}</th>)}</tr></thead>
+                <tbody>{res.rows.map((row, a) => <tr key={a}>{row.map((v, b) => <td key={b}>{v === null ? <i style={{ color: "var(--ui-muted)" }}>null</i> : String(v)}</td>)}</tr>)}</tbody>
+              </table>
             </div>
           )}
         </div>

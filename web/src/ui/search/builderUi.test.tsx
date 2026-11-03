@@ -111,3 +111,25 @@ test("a NOT group shows as pressed and bad limit text stops the search with a me
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Limit must be a whole number");
 });
+
+test("a custom join is picked from two search boxes and used by the search", async () => {
+  useStore.setState({ searchJoins: [] });
+  render(<SearchPanel getValues={getValues} />);
+  fireEvent.click(screen.getByRole("button", { name: "+ Join" }));
+  fireEvent.focus(screen.getByRole("combobox", { name: "Join 1 left column" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Join 1 left column" }), { target: { value: "orders status" } });
+  fireEvent.mouseDown(opts("Join 1 left column")[0]);
+  fireEvent.focus(screen.getByRole("combobox", { name: "Join 1 right column" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Join 1 right column" }), { target: { value: "users id" } });
+  fireEvent.mouseDown(opts("Join 1 right column")[0]);
+  expect(useStore.getState().searchJoins).toEqual([{ from: "public.orders.status", to: "public.users.id" }]);
+  fireEvent.click(screen.getByRole("button", { name: "Remove join 1" }));
+  expect(useStore.getState().searchJoins).toEqual([]);
+});
+
+test("a half-filled join stops the search with a message", async () => {
+  useStore.setState({ searchJoins: [{ from: "public.orders.status", to: "" }] });
+  render(<SearchPanel getValues={getValues} />);
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Join 1: pick both columns");
+});

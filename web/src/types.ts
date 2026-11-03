@@ -61,7 +61,7 @@ export interface Ranked {
 export interface LiveParams { host: string; port: number; dbname: string; user: string; password: string; schema?: string; allow_analyze?: boolean }
 export interface ColumnValues { values: { value: unknown; count: number }[]; truncated: boolean }
 export interface RowsPage { columns: string[]; rows: unknown[][]; total_estimate: number }
-export interface RunResult { columns: string[]; rows: unknown[][]; row_count: number; flags: Flag[] }
+export interface RunResult { columns: string[]; rows: unknown[][]; row_count: number; /** more rows exist than were returned */ truncated?: boolean; flags: Flag[] }
 export interface SchemaError { message: string; line: number; col: number }
 
 // ---- structure lab (sandbox-only schema editing) ----

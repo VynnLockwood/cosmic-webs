@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { vi } from "vitest";
 import { useStore } from "../store/useStore";
 import { ranked } from "../testing/fixtures";
 import type { Candidate, Flag, SchemaGraph } from "../types";
@@ -96,4 +97,29 @@ test("SQL can be shown with $1 params or with the values written in, and Copy fo
   expect(screen.getByText(/WHERE "t0"."x" = \$1/)).toBeInTheDocument();
   expect(screen.getByText(/params:/)).toBeInTheDocument();
   expect(localStorage.getItem("cosmos.sqlMode")).toBe("params");
+});
+
+test("Run shows every returned row in a scroll box, and says when there are more", async () => {
+  const rows = Array.from({ length: 40 }, (_, i) => [i, `name ${i}`]);
+  const api = await import("../api/client");
+  const spy = vi.spyOn(api.api, "run").mockResolvedValue({ columns: ["id", "name"], rows, row_count: 40, truncated: true, flags: [] } as any);
+  useStore.setState({ graph, searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} }, candidates: [cand], results: [ranked("c1", {})], flags: [] });
+  render(<ResultsPanel />);
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  const box = await screen.findByLabelText("Query result rows");
+  expect(spy).toHaveBeenCalledWith(expect.anything(), 200);
+  expect(within(box).getAllByRole("row")).toHaveLength(41); // header + 40
+  expect(box.style.maxHeight).toBe("340px");
+  expect(box.style.overflow).toBe("auto");
+  expect(screen.getByText("first 40 rows shown, there are more")).toBeInTheDocument();
+});
+
+test("a result with all its rows does not claim there are more", async () => {
+  const api = await import("../api/client");
+  vi.spyOn(api.api, "run").mockResolvedValue({ columns: ["id"], rows: [[1], [2]], row_count: 2, truncated: false, flags: [] } as any);
+  useStore.setState({ candidates: [cand], results: [ranked("c1", {})], flags: [], searchRequest: { select: ["public.a.x"], where: null, fk_choices: {} } });
+  render(<ResultsPanel />);
+  fireEvent.click(screen.getByRole("button", { name: "Run" }));
+  expect(await screen.findByText("2 rows")).toBeInTheDocument();
+  expect(screen.queryByText(/there are more/)).toBeNull();
 });

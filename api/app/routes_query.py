@@ -64,11 +64,13 @@ def run(body: RunIn):
     limit = max(1, min(body.limit, MAX_LIMIT))
     with registry.session() as conn:
         try:
-            cols, rows = run_query(conn, body.query.sql, body.query.params, limit)
+            cols, rows = run_query(conn, body.query.sql, body.query.params, limit + 1)  # one extra row tells us there is more
         except NotSelect as e:
             raise HTTPException(400, str(e)) from e
         except Exception as e:
             code, msg = classify(e)
             return JSONResponse(status_code=400, content={"code": code, "message": msg})
+    truncated = len(rows) > limit
+    rows = rows[:limit]
     flags = [] if rows else [{"code": "EMPTY_RESULT", "table": None, "column": None, "message": "query ran but returned 0 rows"}]
-    return jsonable_encoder({"columns": cols, "rows": rows, "row_count": len(rows), "flags": flags})
+    return jsonable_encoder({"columns": cols, "rows": rows, "row_count": len(rows), "truncated": truncated, "flags": flags})

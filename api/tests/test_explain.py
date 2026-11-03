@@ -137,3 +137,13 @@ def test_explain_analyze_runs_the_query_several_times_and_takes_the_median(monke
             return R()
     cost, rows, summary, ms = ex.explain_query(Conn(), "select 1", [], analyze=True, repeat=3)
     assert ms == 2.0 and (cost, rows) == (5.0, 7.0)
+
+
+def test_run_says_when_more_rows_exist_than_were_returned(shop):
+    c, _ = shop
+    few = c.post("/api/run", json={"query": {"sql": USERS}, "limit": 5}).json()
+    assert few["row_count"] == 5 and few["truncated"] is True
+    all_ = c.post("/api/run", json={"query": {"sql": USERS + " WHERE id <= 3"}, "limit": 5}).json()
+    assert all_["row_count"] == 3 and all_["truncated"] is False
+    exact = c.post("/api/run", json={"query": {"sql": USERS + " WHERE id <= 5"}, "limit": 5}).json()
+    assert exact["row_count"] == 5 and exact["truncated"] is False  # exactly the limit is not "more"

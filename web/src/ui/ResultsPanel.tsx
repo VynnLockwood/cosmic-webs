@@ -1,4 +1,5 @@
 import { useStore } from "../store/useStore";
+import { AskedVsRan } from "./AskedVsRan";
 import { FlagList } from "./FlagList";
 import { HowRankingWorks } from "./RankExplainer";
 import { ResultCard } from "./ResultCard";
@@ -16,6 +17,7 @@ export function ResultsPanel() {
       <h2>Results</h2>
       {!req && <p style={{ color: "var(--ui-muted)" }}>Run a search to see the five best query plans.</p>}
       {req && results.length === 0 && <p style={{ color: "var(--ui-muted)" }}>No runnable plan was found.{flags.length ? " See the flags below." : ""}</p>}
+      {req && <AskedVsRan req={req} flags={flags} top={candidates.find((c) => c.id === results[0]?.id) ?? null} />}
       {results.length > 0 && <HowRankingWorks results={results} />}
       {splitHidden > 0 && <div className="warn">{splitHidden} split plan(s) hidden — they return separate result sets. Enable “Include split plans” in Search to rank them too.</div>}
       {results.map((r, i) => {

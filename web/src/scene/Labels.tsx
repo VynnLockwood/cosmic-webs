@@ -42,6 +42,7 @@ export function Labels() {
   const camera = useThree((s) => s.camera);
   const [near, setNear] = useState<number[]>([]);
   useEffect(() => {
+    setNear([]);
     const tick = () => {
       const p = useStore.getState().positions;
       if (p.length !== graph.tables.length * 3) return;
@@ -57,7 +58,7 @@ export function Labels() {
   for (const n of [hovered, selected]) if (n) idx.add(graph.tables.findIndex((t) => t.name === n));
   return (
     <>
-      {[...idx].filter((i) => i >= 0).map((i) => (
+      {[...idx].filter((i) => i >= 0 && i < graph.tables.length).map((i) => ( // `near` can still hold indexes of the previous, bigger graph for one render
         <Label key={i} index={i} name={graph.tables[i].name} strong={graph.tables[i].name === hovered || graph.tables[i].name === selected} />
       ))}
     </>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api as realApi, type Api } from "../api/client";
 import { motionActions } from "../scene/camera/motion";
 import { useStore } from "../store/useStore";
+import { ResizeHandle } from "./ResizeHandle";
 import type { RowsPage } from "../types";
 
 const PAGE = 50;
@@ -21,10 +22,15 @@ export function TablePanel({ api = realApi }: { api?: Pick<Api, "getRows"> }) {
     return () => { alive = false; };
   }, [name, offset, api]);
 
+  const saved = useStore((s) => s.panelWidths.panel);
+  const setWidth = useStore((s) => s.setPanelWidth);
+  const width = saved ?? 420;
   const table = graph?.tables.find((t) => t.name === name);
   const fkOf = (col: string) => graph?.fks.find((f) => f.from.table === name && f.from.columns.includes(col));
   return (
-    <aside className={`panel glass${table ? " open" : ""}`} aria-label="Table details" aria-hidden={!table}>
+    <>
+    <ResizeHandle label="Resize table panel" edge="left" width={width} open={!!table} onResize={(w) => setWidth("panel", w)} style={{ right: 12 + width - 5 }} />
+    <aside className={`panel glass${table ? " open" : ""}`} style={{ width }} aria-label="Table details" aria-hidden={!table}>
       {table && (
         <>
           <button className="btn ghost close" onClick={() => motionActions.back()} aria-label="Close table panel">Esc</button>
@@ -62,5 +68,6 @@ export function TablePanel({ api = realApi }: { api?: Pick<Api, "getRows"> }) {
         </>
       )}
     </aside>
+    </>
   );
 }

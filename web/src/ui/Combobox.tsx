@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export interface ComboOption { value: string; label?: string; hint?: string; group?: string; /** searchable but not shown */ keywords?: string }
 
@@ -34,6 +35,8 @@ export function Combobox({ value, options, onPick, ariaLabel, placeholder, allow
   const [text, setText] = useState<string | null>(null); // null = show the committed value
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
+  const listEl = useRef<HTMLUListElement>(null);
+  const [box, setBox] = useState<{ left: number; top: number; width: number; maxHeight: number }>({ left: 0, top: 0, width: 360, maxHeight: 300 });
 
   const shown = useMemo(() => {
     const words = norm(text ?? "").split(/\s+/).filter(Boolean);
@@ -52,10 +55,28 @@ export function Combobox({ value, options, onPick, ariaLabel, placeholder, allow
   useEffect(() => onActive?.(activeValue), [activeValue]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open) return;
-    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && close();
+    const away = (e: MouseEvent) => !root.current?.contains(e.target as Node) && !listEl.current?.contains(e.target as Node) && close();
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
   });
+
+  // The list floats above everything (outside the panel, so the panel cannot clip it) and is wider than a narrow box.
+  useLayoutEffect(() => {
+    if (!open || !root.current) return;
+    const place = () => {
+      const r = root.current!.getBoundingClientRect();
+      const width = Math.min(Math.max(r.width, 360), window.innerWidth - 16);
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+      const below = window.innerHeight - r.bottom - 12;
+      const above = r.top - 12;
+      const up = below < 180 && above > below;
+      setBox({ left, top: up ? Math.max(8, r.top - Math.min(320, above) - 2) : r.bottom + 2, width, maxHeight: Math.max(120, Math.min(320, up ? above : below)) });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, rows.length]);
 
   function close(picked = false) {
     setOpen(false);
@@ -108,8 +129,8 @@ export function Combobox({ value, options, onPick, ariaLabel, placeholder, allow
         onBlur={() => allowFree && text !== null && text !== value && text !== "" ? pick(text) : undefined}
         onKeyDown={onKey}
       />
-      {open && (
-        <ul id={`${id}-list`} role="listbox" className="combo-list" aria-label={`${ariaLabel} options`}>
+      {open && createPortal(
+        <ul ref={listEl} id={`${id}-list`} role="listbox" className="combo-list" aria-label={`${ariaLabel} options`} style={{ position: "fixed", left: box.left, top: box.top, minWidth: Math.min(360, window.innerWidth - 16), width: box.width, maxHeight: box.maxHeight }}>
           {rows.length === 0 && <li className="combo-empty">No matches</li>}
           {[...g].map(([group, items]) => (
             <li key={group} role="presentation">
@@ -128,7 +149,8 @@ export function Combobox({ value, options, onPick, ariaLabel, placeholder, allow
             </li>
           ))}
           {shown.length > rows.length && <li className="combo-empty">Showing {rows.length} of {shown.length}; keep typing to narrow.</li>}
-        </ul>
+        </ul>,
+        (root.current?.closest(".ui-layer") as HTMLElement | null) ?? document.body,
       )}
     </div>
   );

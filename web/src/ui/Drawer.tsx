@@ -1,4 +1,5 @@
 import { useStore } from "../store/useStore";
+import { ResizeHandle } from "./ResizeHandle";
 import { ResultsPanel } from "./ResultsPanel";
 import { SchemaPanel } from "./SchemaPanel";
 import { SearchPanel } from "./search/SearchPanel";
@@ -8,14 +9,21 @@ import { StructurePanel } from "./structure/StructurePanel";
 
 export function Drawer() {
   const drawer = useStore((s) => s.drawer);
+  const saved = useStore((s) => s.panelWidths.drawer);
+  const setWidth = useStore((s) => s.setPanelWidth);
+  const wide = drawer === "structure" || drawer === "results";
+  const width = saved ?? (wide ? 470 : 320);
   return (
-    <aside className={`drawer glass${drawer ? " open" : ""}${drawer === "structure" || drawer === "results" ? " wide" : ""}`} aria-hidden={!drawer} aria-label="Function drawer">
-      {drawer === "schema" && <SchemaPanel />}
-      {drawer === "source" && <SourcePanel />}
-      {drawer === "structure" && <StructurePanel />}
-      {drawer === "search" && <SearchPanel />}
-      {drawer === "results" && <ResultsPanel />}
-      {drawer === "settings" && <SettingsPanel />}
-    </aside>
+    <>
+      <aside className={`drawer glass${drawer ? " open" : ""}`} style={{ width }} aria-hidden={!drawer} aria-label="Function drawer">
+        {drawer === "schema" && <SchemaPanel />}
+        {drawer === "source" && <SourcePanel />}
+        {drawer === "structure" && <StructurePanel />}
+        {drawer === "search" && <SearchPanel />}
+        {drawer === "results" && <ResultsPanel />}
+        {drawer === "settings" && <SettingsPanel />}
+      </aside>
+      <ResizeHandle label="Resize function drawer" edge="right" width={width} open={!!drawer} onResize={(w) => setWidth("drawer", w)} style={{ left: 80 + width - 5 }} />
+    </>
   );
 }

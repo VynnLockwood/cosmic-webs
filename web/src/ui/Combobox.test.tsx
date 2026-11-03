@@ -79,3 +79,24 @@ test("matches on the name come before matches that only hit a hidden keyword", (
   fireEvent.change(input(), { target: { value: "ship" } });
   expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([expect.stringContaining("shipments"), expect.stringContaining("orders")]);
 });
+
+test("the list is drawn outside its container (so a panel cannot clip it) and is at least 360px wide", () => {
+  const { container } = render(<Harness />);
+  fireEvent.focus(input());
+  const list = screen.getByRole("listbox", { name: "Column options" });
+  expect(container.contains(list)).toBe(false);
+  expect(list.style.minWidth).toBe("360px");
+  expect(list.style.position).toBe("fixed");
+});
+
+test("picking with the mouse does not also count as clicking away", () => {
+  const onClose = vi.fn();
+  render(<Harness onClose={onClose} />);
+  fireEvent.focus(input());
+  const option = screen.getAllByRole("option")[0];
+  fireEvent.mouseDown(option);
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.focus(input());
+  fireEvent.mouseDown(document.body);
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

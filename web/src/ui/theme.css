@@ -9,7 +9,6 @@
 .rail button:hover, .rail button[aria-pressed="true"] { background: rgba(160, 180, 255, 0.14); color: var(--active); }
 .rail svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .drawer { position: absolute; top: 12px; left: 80px; bottom: 12px; width: 320px; padding: 14px; overflow: auto; transform: translateX(-16px); opacity: 0; visibility: hidden; transition: transform 220ms ease-out, opacity 220ms ease-out, visibility 220ms; }
-.drawer.wide { width: 470px; }
 .drawer.open { transform: none; opacity: 1; visibility: visible; }
 .panel { position: absolute; top: 12px; right: 12px; bottom: 12px; width: 420px; padding: 14px; overflow: auto; transform: translateX(24px); opacity: 0; visibility: hidden; transition: transform 220ms ease-out, opacity 220ms ease-out, visibility 220ms; }
 .panel.open { transform: none; opacity: 1; visibility: visible; }
@@ -40,7 +39,7 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 12px; } table.gr
 .import-fill { height: 100%; background: linear-gradient(90deg, #6aa8ff, #b48cff); transition: width .25s ease; }
 
 .combo input { width: 100%; box-sizing: border-box; }
-.combo-list { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px 0; list-style: none; max-height: 240px; overflow: auto; background: rgba(8, 12, 26, .97); border: 1px solid rgba(140, 170, 255, .3); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+.combo-list { z-index: 60; pointer-events: auto; margin: 0; box-sizing: border-box; padding: 4px 0; list-style: none; max-height: 240px; overflow: auto; background: rgba(8, 12, 26, .97); border: 1px solid rgba(140, 170, 255, .3); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
 .combo-list ul { list-style: none; margin: 0; padding: 0; }
 .combo-group { padding: 4px 10px 2px; font-size: 11px; color: var(--ui-muted); text-transform: none; }
 .combo-opt { display: flex; justify-content: space-between; gap: 10px; padding: 3px 10px 3px 16px; cursor: pointer; font-family: ui-monospace, monospace; font-size: 12px; }
@@ -53,3 +52,11 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 12px; } table.gr
 
 .boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ui-muted); letter-spacing: .08em; pointer-events: none; animation: boot-pulse 1.6s ease-in-out infinite; }
 @keyframes boot-pulse { 50% { opacity: .45; } }
+
+.resize-handle { position: absolute; top: 12px; bottom: 12px; width: 10px; cursor: col-resize; z-index: 8; pointer-events: auto; touch-action: none; opacity: 0; visibility: hidden; }
+.resize-handle.open { visibility: visible; opacity: 1; }
+.resize-handle::after { content: ""; position: absolute; top: 50%; left: 4px; width: 2px; height: 44px; margin-top: -22px; border-radius: 2px; background: rgba(160, 180, 255, .25); transition: background .15s, height .15s; }
+.resize-handle:hover::after, .resize-handle:focus-visible::after { background: rgba(160, 200, 255, .8); height: 72px; margin-top: -36px; }
+.resize-handle:focus-visible { outline: none; }
+
+.dropped { color: var(--red); text-decoration: line-through; text-decoration-thickness: 2px; background: rgba(255, 92, 108, .12); border-radius: 3px; }

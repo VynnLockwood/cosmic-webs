@@ -5,6 +5,19 @@ import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
+export interface PanelWidths { drawer: number | null; panel: number | null }
+const WIDTHS_KEY = "cosmos.widths";
+/** Saved panel widths (null = default). A broken saved value is ignored. */
+export function loadWidths(): PanelWidths {
+  try {
+    const v = JSON.parse(localStorage.getItem(WIDTHS_KEY) ?? "");
+    const ok = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : null);
+    return { drawer: ok(v?.drawer), panel: ok(v?.panel) };
+  } catch {
+    return { drawer: null, panel: null };
+  }
+}
+
 export type TierSetting = "auto" | "high" | "medium" | "low";
 
 export interface State {
@@ -27,6 +40,9 @@ export interface State {
   setSearchOptions(o: { measureTime?: boolean; includeSplit?: boolean }): void;
   flags: Flag[];
   tier: TierSetting;
+  /** widths the user dragged the side panels to (null = default) */
+  panelWidths: PanelWidths;
+  setPanelWidth(k: keyof PanelWidths, w: number | null): void;
   reducedMotion: boolean;
   /** per-table / per-fk visual overrides set by search, flags and fly-in */
   dotOverrides: Record<string, DotState>;
@@ -109,6 +125,13 @@ export const useStore = create<State>((set) => ({
   setSearchOptions: (o) => set(o),
   flags: [],
   tier: initialTier(),
+  panelWidths: loadWidths(),
+  setPanelWidth: (k, w) =>
+    set((s) => {
+      const panelWidths = { ...s.panelWidths, [k]: w };
+      try { localStorage.setItem(WIDTHS_KEY, JSON.stringify(panelWidths)); } catch { /* private mode: keep it for this visit only */ }
+      return { panelWidths };
+    }),
   dotOverrides: {},
   linkOverrides: {},
   searchSelect: [],

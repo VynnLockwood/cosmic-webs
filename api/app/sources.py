@@ -30,6 +30,8 @@ class SourceRegistry:
         self.mode: Literal["sandbox", "live"] = "sandbox"
         self.live: LiveParams | None = None
         self.graph: SchemaGraph | None = None
+        # where the rows come from: "dump" (the uploaded file), "mock" (generated) or "live" (a real database)
+        self.data_source: str = "mock"
 
     def use_sandbox(self) -> None:
         self.mode, self.live = "sandbox", None

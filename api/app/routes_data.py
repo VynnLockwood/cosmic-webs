@@ -21,6 +21,7 @@ def get_source():
 def connect_live(p: LiveParams):
     try:
         registry.use_live(p)
+        registry.data_source = "live"
         with registry.session() as c:
             registry.graph = introspect(c, p.schema_)
     except psycopg.Error as e:
@@ -33,6 +34,7 @@ def connect_live(p: LiveParams):
 @router.delete("/source/live")
 def disconnect_live():
     registry.use_sandbox()
+    registry.data_source = "mock"
     registry.graph = None
     return {"mode": registry.mode}
 
@@ -51,3 +53,14 @@ def table_rows(name: str, limit: int = Query(50, ge=1), offset: int = Query(0, g
         cols = [d.name for d in cur.description]
         rows = [list(r) for r in cur.fetchall()]
     return jsonable_encoder({"columns": cols, "rows": rows, "total_estimate": table.row_estimate})
+
+
+@router.get("/relations/suggest")
+def suggest_relations():
+    """Relations the schema does not declare, with evidence from the rows when they are real."""
+    from .relations import suggest
+
+    use_data = registry.data_source in ("dump", "live")
+    with registry.session() as conn:
+        found = suggest(conn, registry.active_graph(), use_data)
+    return {"data_source": registry.data_source, "suggestions": [s.model_dump() for s in found]}

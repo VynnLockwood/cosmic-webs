@@ -44,6 +44,7 @@ def _load(ddl: str, use_dump_data: bool = True) -> dict:
             out["data"] = {"source": rep.data_source, "rows_loaded": rep.rows_loaded, "tables_with_data": rep.tables_with_data, "tables_empty": rep.tables_empty}
             registry.use_sandbox()
             registry.graph = r.graph
+            registry.data_source = rep.data_source
         except psycopg.Error as e:
             r.warnings.append(f"sandbox unavailable: {e}")
         out["graph"], out["warnings"] = r.graph.model_dump(by_alias=True), r.warnings

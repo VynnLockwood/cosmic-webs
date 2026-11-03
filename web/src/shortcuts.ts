@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { Dir } from "./scene/camera/motion";
 
 export type Action =
-  | { type: "focusSearch" | "back" | "frameAll" | "zoomIn" | "zoomOut" }
+  | { type: "focusSearch" | "focusFind" | "back" | "frameAll" | "zoomIn" | "zoomOut" }
   | { type: "rotate15"; dir: Dir };
 
 /** Keyboard map from the visual spec §8. */
@@ -25,6 +25,11 @@ export function useShortcuts(handle: (a: Action) => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        handle({ type: "focusFind" });
+        return;
+      }
       const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
       if (typing && e.key !== "Escape") return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;

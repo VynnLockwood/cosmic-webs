@@ -5,6 +5,7 @@ import { motionActions } from "./scene/camera/motion";
 import Scene from "./scene/Scene";
 import { SKY_ONLY } from "./scene/e2eHook";
 import { Drawer } from "./ui/Drawer";
+import { FindTable } from "./ui/FindTable";
 import { ImportProgress } from "./ui/ImportProgress";
 import { Hud } from "./ui/Hud";
 import { Rail } from "./ui/Rail";
@@ -29,6 +30,7 @@ export default function App() {
       case "zoomOut": return motionActions.zoom(-1);
       case "rotate15": return motionActions.rotate15(a.dir);
       case "focusSearch": return useStore.getState().setDrawer("search");
+      case "focusFind": return void window.dispatchEvent(new Event("cosmos:find"));
     }
   }, []);
   useShortcuts(onAction);
@@ -41,6 +43,7 @@ export default function App() {
           <Rail />
           <Drawer />
           <TablePanel />
+          <FindTable />
           <Hud />
           <ImportProgress floating />
         </div>

@@ -5,11 +5,16 @@ import { ColumnPicker, useColumns } from "./ColumnPicker";
 import { ConditionEditor } from "./ConditionEditor";
 import { draftToCond } from "./draft";
 import { toRequest } from "./searchTree";
+import { QueryShape } from "./QueryShape";
+import { shapeToRequest } from "./shape";
+import type { GetValues } from "./ValueInput";
 
-export function SearchPanel() {
+export function SearchPanel({ getValues }: { getValues?: GetValues } = {}) {
   const cols = useColumns();
   const select = useStore((s) => s.searchSelect);
   const draft = useStore((s) => s.searchDraft);
+  const shape = useStore((s) => s.searchShape);
+  const importing = useStore((s) => s.importProgress !== null);
   const setDraft = useStore((s) => s.setSearchDraft);
   const measure = useStore((s) => s.measureTime);
   const includeSplit = useStore((s) => s.includeSplit);
@@ -18,12 +23,15 @@ export function SearchPanel() {
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
+  const canRun = select.length > 0 || shape.aggregates.length > 0 || shape.groupBy.length > 0;
   const run = async () => {
     const { cond, errors } = draftToCond(draft, (c) => cols.find((x) => x.full === c)?.type);
-    setErrors(errors);
-    if (errors.length) return;
+    const sh = shapeToRequest(shape);
+    const all = [...errors, ...sh.errors];
+    setErrors(all);
+    if (all.length) return;
     const s = useStore.getState();
-    const req = toRequest(select, cond, s.fkChoices);
+    const req = toRequest(select, cond, s.fkChoices, sh.fields);
     s.setSearch(req);
     setBusy(true);
     try {
@@ -43,7 +51,8 @@ export function SearchPanel() {
       <h3>Columns to fetch</h3>
       <ColumnPicker />
       <h3>Conditions</h3>
-      <ConditionEditor tree={draft} columns={cols} defaultCol={select[0] ?? cols[0]?.full ?? ""} onChange={setDraft} />
+      <ConditionEditor tree={draft} columns={cols} defaultCol={select[0] ?? cols[0]?.full ?? ""} onChange={setDraft} getValues={getValues} />
+      <QueryShape />
       <h3>Ranking</h3>
       <label className="row" style={{ cursor: mode === "sandbox" ? "pointer" : "not-allowed" }}>
         <input type="checkbox" checked={measure && mode === "sandbox"} disabled={mode !== "sandbox"} onChange={(e) => setOpts({ measureTime: e.target.checked })} />
@@ -55,8 +64,8 @@ export function SearchPanel() {
       </label>
       {errors.map((e, i) => <div key={i} className="err" role="alert">{e}</div>)}
       <div className="row" style={{ marginTop: 12 }}>
-        <button className="btn" onClick={run} disabled={busy || select.length === 0}>{busy ? "Searching…" : "Search"}</button>
-        {select.length === 0 && <span style={{ color: "var(--ui-muted)" }}>Pick at least one column.</span>}
+        <button className="btn" onClick={run} disabled={busy || importing || !canRun}>{busy ? "Searching…" : importing ? "Import running…" : "Search"}</button>
+        {!canRun && <span style={{ color: "var(--ui-muted)" }}>Pick at least one column (or an aggregate).</span>}
       </div>
     </>
   );

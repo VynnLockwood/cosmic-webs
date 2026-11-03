@@ -64,3 +64,33 @@ def suggest_relations():
     with registry.session() as conn:
         found = suggest(conn, registry.active_graph(), use_data)
     return {"data_source": registry.data_source, "suggestions": [s.model_dump() for s in found]}
+
+
+MAX_VALUES = 200
+
+
+def _like_escape(q: str) -> str:
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@router.get("/tables/{table:path}/columns/{column}/values")
+def column_values(table: str, column: str, q: str = "", limit: int = Query(50, ge=1)):
+    """Distinct values of a column, most frequent first, optionally filtered by text (autocomplete for conditions)."""
+    t = next((x for x in registry.active_graph().tables if x.name == table), None)
+    col = next((c for c in t.columns if c.name == column), None) if t else None
+    if t is None or col is None:
+        raise HTTPException(404, f"unknown column {table}.{column}")
+    limit = min(limit, MAX_VALUES)
+    expr = sql.SQL("{}::text").format(sql.Identifier(column)) if col.type in ("json", "xml") else sql.Identifier(column)
+    where = sql.SQL("{} is not null").format(sql.Identifier(column))
+    params: list = []
+    if q:
+        where = sql.SQL("{} and {}::text ilike %s escape '\\'").format(where, sql.Identifier(column))
+        params.append(f"%{_like_escape(q)}%")
+    query = sql.SQL("select {e}, count(*) from {t} where {w} group by 1 order by 2 desc, 1 limit %s").format(e=expr, t=ident(table), w=where)
+    try:
+        with registry.session() as conn:
+            rows = conn.execute(query, (*params, limit + 1)).fetchall()
+    except psycopg.Error:
+        rows = []  # unreadable column (permission, unsupported type): no suggestions rather than an error
+    return jsonable_encoder({"values": [{"value": v, "count": n} for v, n in rows[:limit]], "truncated": len(rows) > limit})

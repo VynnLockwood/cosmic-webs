@@ -38,3 +38,15 @@ table.grid { border-collapse: collapse; width: 100%; font-size: 12px; } table.gr
 .import-line { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .import-track { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .1); overflow: hidden; }
 .import-fill { height: 100%; background: linear-gradient(90deg, #6aa8ff, #b48cff); transition: width .25s ease; }
+
+.combo input { width: 100%; box-sizing: border-box; }
+.combo-list { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 2px 0 0; padding: 4px 0; list-style: none; max-height: 240px; overflow: auto; background: rgba(8, 12, 26, .97); border: 1px solid rgba(140, 170, 255, .3); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+.combo-list ul { list-style: none; margin: 0; padding: 0; }
+.combo-group { padding: 4px 10px 2px; font-size: 11px; color: var(--ui-muted); text-transform: none; }
+.combo-opt { display: flex; justify-content: space-between; gap: 10px; padding: 3px 10px 3px 16px; cursor: pointer; font-family: ui-monospace, monospace; font-size: 12px; }
+.combo-opt.active { background: rgba(120, 160, 255, .22); }
+.combo-hint { color: var(--ui-muted); }
+.combo-empty { padding: 6px 10px; color: var(--ui-muted); font-size: 12px; }
+
+.find-table { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); width: min(340px, 60vw); padding: 6px 8px; z-index: 25; }
+.find-table input { width: 100%; }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
+import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
 export type Drawer = "schema" | "source" | "structure" | "search" | "results" | "settings" | null;
@@ -36,6 +37,9 @@ export interface State {
   /** search builder state (kept here so closing the drawer does not lose it) */
   searchSelect: string[];
   searchDraft: Draft | null;
+  /** DISTINCT / sort / limit / aggregates / group / having as typed */
+  searchShape: ShapeDraft;
+  setSearchShape(s: ShapeDraft): void;
   fkChoices: Record<string, string>;
   setSearchSelect(v: string[]): void;
   setSearchDraft(d: Draft | null): void;
@@ -109,6 +113,8 @@ export const useStore = create<State>((set) => ({
   linkOverrides: {},
   searchSelect: [],
   searchDraft: null,
+  searchShape: emptyShape(),
+  setSearchShape: (searchShape) => set({ searchShape }),
   fkChoices: {},
   setSearchSelect: (searchSelect) => set({ searchSelect }),
   setSearchDraft: (searchDraft) => set({ searchDraft }),
@@ -144,7 +150,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, searchShape: emptyShape(), fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

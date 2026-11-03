@@ -69,7 +69,7 @@ export function Dots() {
         <meshBasicMaterial toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={halo} args={[geo, undefined, n]} raycast={() => null}>
-        <meshBasicMaterial transparent opacity={0.35} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial transparent opacity={0.5} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={ring} args={[undefined, undefined, n]} raycast={() => null}>
         <ringGeometry args={[0.92, 1, 48]} />

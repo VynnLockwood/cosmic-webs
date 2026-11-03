@@ -127,8 +127,9 @@ export function DirectorDriver() {
       if (p >= 1) s.bangStart = -1;
     } else if (motion.bang < 1 && E2E) motion.bang = motion.linkFade = 1;
 
-    const { graph: g, positions } = useStore.getState();
-    if (g && s.opened !== g && positions.length === g.tables.length * 3) {
+    const { graph: g, positions, layoutSettled } = useStore.getState();
+    // browser tests frame the *settled* layout so the camera pose does not depend on frame timing
+    if (g && s.opened !== g && positions.length === g.tables.length * 3 && (!E2E || layoutSettled)) {
       s.opened = g;
       const home = frameSetPose(allPoints(), fov());
       if (E2E) apply(home);

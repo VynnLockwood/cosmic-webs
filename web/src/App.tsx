@@ -28,7 +28,11 @@ export default function App() {
   }, []);
   const onAction = useCallback((a: Action) => {
     switch (a.type) {
-      case "back": return useStore.getState().selectedTable ? motionActions.back() : undefined;
+      case "back": {
+        const st = useStore.getState();
+        if (st.selectedTable) return motionActions.back();
+        return st.drawer ? st.setDrawer(null) : undefined;
+      }
       case "frameAll": return motionActions.frameAll();
       case "zoomIn": return motionActions.zoom(1);
       case "zoomOut": return motionActions.zoom(-1);

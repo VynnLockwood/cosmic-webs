@@ -70,7 +70,7 @@ test("data size buttons refill the sandbox", () => {
 test("advanced DDL is sent as a raw statement", () => {
   render(<StructurePanel />);
   fireEvent.change(screen.getByLabelText("DDL statement"), { target: { value: "create index on orders (total)" } });
-  fireEvent.click(within(screen.getByText("Advanced: run one DDL statement").closest("details")!).getByRole("button", { name: "Run" }));
+  fireEvent.click(within(screen.getByText("Advanced").closest("details")!).getByRole("button", { name: "Run" }));
   expect(mocks.applyStructure).toHaveBeenCalledWith([{ kind: "sql", statement: "create index on orders (total)" }]);
 });
 
@@ -113,4 +113,13 @@ test("on a live database the lab is switched off", () => {
   expect(screen.getByText(/never on a live database/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Add index" })).toBeNull();
   expect(mocks.loadStructure).not.toHaveBeenCalled();
+});
+
+test("the lab is split into collapsible cards, with the before/after one open", () => {
+  render(<StructurePanel />);
+  const card = (name: string) => screen.getByText(name, { selector: ".fold-title" }).closest("details")!;
+  expect(card("Before / after").open).toBe(true);
+  expect(card("Advanced").open).toBe(false);
+  expect(card("Export")).toBeInTheDocument();
+  expect(screen.getByLabelText("How it works").children).toHaveLength(4);
 });

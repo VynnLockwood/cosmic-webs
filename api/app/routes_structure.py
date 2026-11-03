@@ -1,3 +1,5 @@
+from typing import Literal
+
 import psycopg
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -58,3 +60,41 @@ def refill(body: RefillIn):
     _after_change(graph)
     with admin_conn() as conn:
         return {**state(conn), "graph": graph.model_dump(by_alias=True)}
+
+
+def _pg_dump() -> str | None:
+    import glob
+    import shutil
+
+    found = shutil.which("pg_dump")
+    if found:
+        return found
+    candidates = sorted(glob.glob("/usr/lib/postgresql/*/bin/pg_dump"), reverse=True)
+    return candidates[0] if candidates else None
+
+
+@router.get("/structure/export")
+def export_structure(kind: Literal["schema", "full"] = "schema"):
+    """Download the sandbox as a .sql file: its structure (tables, keys, indexes) or structure plus rows."""
+    import os
+    import subprocess
+    import tempfile
+
+    from fastapi.responses import FileResponse
+    from starlette.background import BackgroundTask
+
+    _sandbox_only()
+    exe = _pg_dump()
+    if exe is None:
+        return JSONResponse(status_code=501, content={"message": "pg_dump is not installed on the server, so the export is not available."})
+    fd, path = tempfile.mkstemp(suffix=".sql")
+    os.close(fd)
+    args = [exe, "--no-owner", "--no-privileges", "--no-comments", "--file", path, "--dbname", os.environ["SANDBOX_DSN"]]
+    if kind == "schema":
+        args.insert(1, "--schema-only")
+    done = subprocess.run(args, capture_output=True, text=True)
+    if done.returncode != 0:
+        os.unlink(path)
+        return JSONResponse(status_code=500, content={"message": (done.stderr.strip().splitlines() or ["pg_dump failed"])[-1]})
+    name = "cosmic-webs-structure.sql" if kind == "schema" else "cosmic-webs-structure-and-data.sql"
+    return FileResponse(path, media_type="text/plain; charset=utf-8", filename=name, background=BackgroundTask(os.unlink, path))

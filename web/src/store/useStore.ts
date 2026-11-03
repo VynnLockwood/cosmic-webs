@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { DotState, LinkState } from "../scene/style";
 import type { Draft } from "../ui/search/draft";
+import type { ChangeEntry } from "./exportScripts";
 import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
 
@@ -77,10 +78,12 @@ export interface State {
   structureBusy: boolean;
   structureError: string | null;
   lastExecuted: string[];
+  /** every change made in the structure lab this session (for the changes script) */
+  changeLog: ChangeEntry[];
   /** set by replaceGraph: the next graph keeps camera and layout (no opening animation) */
   keepView: boolean;
   replaceGraph(g: SchemaGraph): void;
-  patchStructure(p: Partial<Pick<State, "indexes" | "suggestions" | "suggestionsSource" | "experiments" | "structureBusy" | "structureError" | "lastExecuted">>): void;
+  patchStructure(p: Partial<Pick<State, "indexes" | "suggestions" | "suggestionsSource" | "experiments" | "structureBusy" | "structureError" | "lastExecuted" | "changeLog">>): void;
   importData: ImportData | null;
   /** set while a schema import runs in the background (null when idle) */
   importProgress: ImportProgressInfo | null;
@@ -163,6 +166,7 @@ export const useStore = create<State>((set) => ({
   structureBusy: false,
   structureError: null,
   lastExecuted: [],
+  changeLog: [],
   keepView: false,
   replaceGraph: (graph) =>
     set((s) => ({
@@ -187,7 +191,7 @@ export const useStore = create<State>((set) => ({
   setFlyingIn: (flyingIn) => set({ flyingIn }),
   setOverrides: (dotOverrides, linkOverrides) => set({ dotOverrides, linkOverrides }),
   reducedMotion: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches,
-  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, searchShape: emptyShape(), fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], dotOverrides: {}, linkOverrides: {} }),
+  setGraph: (graph) => set({ graph, selectedTable: null, hoveredTable: null, panelTable: null, layoutSettled: false, results: [], candidates: [], costs: {}, splitHidden: 0, flags: [], searchRequest: null, searchSelect: [], searchDraft: null, searchShape: emptyShape(), fkChoices: {}, experiments: [], indexes: [], suggestions: [], suggestionsSource: null, structureError: null, lastExecuted: [], changeLog: [], dotOverrides: {}, linkOverrides: {} }),
   setPositions: (positions) => set({ positions }),
   selectTable: (selectedTable) => set({ selectedTable }),
   hoverTable: (hoveredTable) => set({ hoveredTable }),

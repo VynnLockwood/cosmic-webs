@@ -131,7 +131,7 @@ class Gen:
         return f.word()
 
 
-def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 0, warnings: list[str] | None = None) -> dict[str, int]:
+def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 0, warnings: list[str] | None = None, progress=None) -> dict[str, int]:
     """Fill every table. FKs are valid; cycle/self FKs are inserted NULL then UPDATEd."""
     order, deferred = fk_load_order(graph)
     dids = {f.id for f in deferred}
@@ -140,7 +140,9 @@ def fill_mock(conn, graph: SchemaGraph, rows_per_table: int = 1000, seed: int = 
     rows: dict[str, list[dict]] = {}
     counts: dict[str, int] = {}
 
-    for tname in order:
+    for n, tname in enumerate(order):
+        if progress:
+            progress("Loading rows", n / max(len(order), 1), tname)
         t = tables[tname]
         live_fks = [f for f in graph.fks if f.from_.table == tname and f.id not in dids]
         fkcols = {c for f in live_fks for c in f.from_.columns}

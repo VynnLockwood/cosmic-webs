@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { api } from "./api/client";
+import { resetSchema } from "./store/actions";
 import { useSearchHighlight } from "./search/useHighlight";
 import { motionActions } from "./scene/camera/motion";
 import { SKY_ONLY } from "./scene/e2eHook";
@@ -20,10 +20,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const graph = useStore((s) => s.graph);
   useEffect(() => {
-    api
-      .getDefaultSchema()
-      .then((r) => useStore.getState().setGraph(r.graph))
-      .catch((e) => setError(String(e.message ?? e)));
+    // the default schema loads as a background job: the graph shows at once, rows and progress follow
+    resetSchema().then(() => {
+      const e = useStore.getState().schemaError;
+      if (e && !useStore.getState().graph) setError(e.message);
+    });
   }, []);
   const onAction = useCallback((a: Action) => {
     switch (a.type) {

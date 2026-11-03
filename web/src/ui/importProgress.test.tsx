@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test } from "vitest";
-import { loadSchema } from "../store/actions";
+import { loadSchema, resetSchema } from "../store/actions";
 import { useStore } from "../store/useStore";
 import { ImportProgress } from "./ImportProgress";
 import { ApiError } from "../api/client";
@@ -59,4 +59,20 @@ test("the progress bar shows stage, table and percent, and renders nothing when 
   expect(bar).toHaveAttribute("aria-valuenow", "42");
   expect(screen.getByText(/Loading rows/)).toBeInTheDocument();
   expect(screen.getByText(/public\.orders/)).toBeInTheDocument();
+});
+
+test("resetting to the default schema also runs as a job with progress (no silent wait)", async () => {
+  const sent: unknown[] = [];
+  const api = {
+    ...fakeApi([{ id: "j1", status: "running", stage: "Creating tables", percent: 12, message: "" }, { id: "j1", status: "done", stage: "Done", percent: 100, message: "", result: { graph: tiny(5), warnings: [] } }]),
+    startSchemaJob: async (ddl: string | null) => (sent.push(ddl), { job_id: "j1", graph: tiny(0), warnings: [] }),
+  };
+  const seen: string[] = [];
+  const unsub = useStore.subscribe((st) => st.importProgress && seen.push(st.importProgress.stage));
+  await act(() => resetSchema({ api } as any, { pollMs: 1 }));
+  unsub();
+  expect(sent).toEqual([null]); // null = the bundled default schema
+  expect(seen).toContain("Creating tables");
+  expect(useStore.getState().graph!.tables[0].row_estimate).toBe(5);
+  expect(useStore.getState().importProgress).toBeNull();
 });

@@ -61,8 +61,9 @@ export async function loadSchema(ddl: string, deps: Deps = real, opts: JobOpts =
   }
 }
 
-export async function resetSchema(deps: Deps = real): Promise<void> {
+export async function resetSchema(deps: Deps = real, opts: JobOpts = {}): Promise<void> {
   try {
+    if (deps.api.startSchemaJob && deps.api.getJob) return await runJob(null, deps, opts);
     const r = await deps.api.getDefaultSchema();
     show(r.graph, r.warnings, "sandbox", r.data ?? null);
     void loadSuggestions(deps);

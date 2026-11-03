@@ -12,6 +12,7 @@ export const shopSql = fs.readFileSync(path.resolve(here, "../../samples/shop.sq
 export async function mockApi(page: Page, graph: any = shop) {
   if (process.env.E2E_REAL_API) return;
   await page.route("**/api/schema/default", (r) => r.fulfill({ json: { graph, warnings: [] } }));
+  await mockImportJob(page, graph);
   await page.route("**/api/tables/**/values**", (r) => r.fulfill({ json: { values: [], truncated: false } }));
 }
 

@@ -1,11 +1,19 @@
 """Parse Postgres DDL into a SchemaGraph using pglast."""
+import re
+
 from pglast import ast, parse_sql
 from pglast.enums import AlterTableType, ConstrType
 from pglast.parser import ParseError
 
 from .models import Column, Fk, FkEnd, ParseResult, SchemaGraph, Table
 
-SILENT = (ast.CreateEnumStmt, ast.CreateSchemaStmt, ast.IndexStmt, ast.CreateExtensionStmt, ast.CommentStmt)
+# statements that are normal in pg_dump / pgAdmin output and irrelevant to the web: skipped without a warning
+SILENT = (
+    ast.CreateEnumStmt, ast.CreateSchemaStmt, ast.IndexStmt, ast.CreateExtensionStmt, ast.CommentStmt,
+    ast.VariableSetStmt, ast.SelectStmt, ast.AlterOwnerStmt, ast.GrantStmt, ast.GrantRoleStmt,
+    ast.CreateSeqStmt, ast.AlterSeqStmt, ast.AlterDefaultPrivilegesStmt, ast.DropStmt, ast.TransactionStmt,
+)
+_COPY_START = re.compile(r"^\s*COPY\s.+\sFROM\s+stdin", re.IGNORECASE)
 TYPE_ALIASES = {"serial": "int4", "bigserial": "int8", "smallserial": "int2"}
 
 
@@ -13,6 +21,28 @@ class DdlError(Exception):
     def __init__(self, message: str, line: int = 1, col: int = 1):
         super().__init__(message)
         self.message, self.line, self.col = message, line, col
+
+
+def strip_psql(sql: str) -> str:
+    """Blank out what only psql understands: `\\restrict`-style meta-commands and COPY ... FROM stdin data blocks.
+
+    Lines are replaced by empty lines (not removed) so error positions still match the original file.
+    """
+    out: list[str] = []
+    in_copy = False
+    for line in sql.splitlines(keepends=True):
+        nl = "\n" if line.endswith("\n") else ""
+        if in_copy:
+            in_copy = line.rstrip("\r\n") != "\\."
+            out.append(nl)
+        elif _COPY_START.match(line):
+            in_copy = True
+            out.append(nl)
+        elif line.lstrip().startswith("\\"):
+            out.append(nl)
+        else:
+            out.append(line)
+    return "".join(out)
 
 
 def _qname(rel: ast.RangeVar) -> str:
@@ -30,11 +60,19 @@ def _type_name(tn: ast.TypeName) -> str:
 
 def parse_ddl(sql: str) -> ParseResult:
     try:
-        stmts = parse_sql(sql)
+        clean = strip_psql(sql)
+        stmts = parse_sql(clean)
     except ParseError as e:
         loc = e.args[1] if len(e.args) > 1 and isinstance(e.args[1], int) else 0
-        line = sql.count("\n", 0, loc) + 1
-        col = loc - (sql.rfind("\n", 0, loc) + 1) + 1
+        if not clean.isascii():
+            # pglast mis-converts error offsets once multi-byte characters (e.g. Thai comments) appear; re-parse
+            # a same-length ASCII copy to get the exact character offset.
+            try:
+                parse_sql(re.sub(r"[^\x00-\x7f]", "x", clean))
+            except ParseError as e2:
+                loc = e2.args[1] if len(e2.args) > 1 and isinstance(e2.args[1], int) else loc
+        line = clean.count("\n", 0, loc) + 1  # same line count as the original file
+        col = loc - (clean.rfind("\n", 0, loc) + 1) + 1
         raise DdlError(str(e.args[0]) if e.args else "syntax error", line, col) from e
 
     tables: dict[str, Table] = {}

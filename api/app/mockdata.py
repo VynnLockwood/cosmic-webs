@@ -76,8 +76,9 @@ class Gen:
             return r.random() < 0.5
         if typ in ("numeric", "float4", "float8"):
             _, prec, scale = self.limits.get((table, name), (None, None, None))
-            top = 10 ** (prec - scale) - 1 if prec else 500
-            return round(r.uniform(0, min(500, top)), scale if scale is not None else 2)
+            if typ != "numeric" or prec is None or scale is None:  # floats (and unconstrained numeric) have no precision limit
+                return round(r.uniform(0, 500), 2)
+            return round(r.uniform(0, min(500, 10 ** (prec - scale) - 1)), scale)
         if typ in ("timestamptz", "timestamp"):
             return datetime.now(timezone.utc) - timedelta(seconds=r.randint(0, 2 * 365 * 86400))
         if typ == "date":

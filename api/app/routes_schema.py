@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import psycopg
 
 from .ddl import DdlError, parse_ddl
-from .sandbox import rebuild_sandbox
+from .sandbox import rebuild_sandbox_report
 from .sources import registry
 
 router = APIRouter(prefix="/api")
@@ -30,7 +30,8 @@ def _load(ddl: str) -> dict:
     r = parse_ddl(ddl)
     if os.environ.get("SANDBOX_DSN"):
         try:
-            r.graph = rebuild_sandbox(ddl, r.graph)
+            r.graph, notes = rebuild_sandbox_report(ddl, r.graph)
+            r.warnings.extend(notes)
             registry.use_sandbox()
             registry.graph = r.graph
         except psycopg.Error as e:

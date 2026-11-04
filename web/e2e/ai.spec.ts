@@ -10,7 +10,8 @@ test("expected result: key and model live in localStorage, the model sees only n
     await route.fulfill({ json: { choices: [{ message: { content: "```json\n" + JSON.stringify(answer) + "\n```" } }] }, headers: { "access-control-allow-origin": "*" } });
   });
   await open(page, "e2e=1&tier=low");
-  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("tab", { name: "AI" }).click();
   await page.getByLabel("OpenRouter API key").fill("sk-or-test-123");
   await page.getByLabel("Model", { exact: true }).fill("openai/gpt-4o-mini");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("cosmos.ai")!))).toEqual({ apiKey: "sk-or-test-123", model: "openai/gpt-4o-mini" });

@@ -5,6 +5,8 @@ import type { ChangeEntry } from "./exportScripts";
 import { clearVisual, DEFAULT_VISUAL, loadVisual, normalizeVisual, saveVisual, type VisualSettings } from "./visualSettings";
 import { clearAi, loadAi, saveAi, type AiSettings } from "../ai/aiSettings";
 import type { AiSql } from "../ai/parseAnswer";
+import { loadCases, type CaseBook } from "./useCases";
+import type { SavedDbInfo } from "./dbStore";
 import type { VJoin } from "../search/virtualJoins";
 import { emptyShape, type ShapeDraft } from "../ui/search/shape";
 import type { ImportProgressInfo, Candidate, Experiment, ImportData, IndexInfo, Flag, Suggestion, Ranked, SchemaError, SchemaGraph, SearchRequest } from "../types";
@@ -28,6 +30,11 @@ export function loadWidths(): PanelWidths {
   } catch {
     return { drawer: null, panel: null };
   }
+}
+
+const REMEMBER_KEY = "cosmos.rememberDb";
+export function loadRememberDb(): boolean {
+  try { return localStorage.getItem(REMEMBER_KEY) !== "no"; } catch { return true; }
 }
 
 export type TierSetting = "auto" | "high" | "medium" | "low";
@@ -75,6 +82,17 @@ export interface State {
   searchShape: ShapeDraft;
   /** joins the user declared for the search (columns whose values match) */
   searchJoins: VJoin[];
+  /** the plain-words wish typed in Expected result (kept here so a use case can save it) */
+  aiGoal: string;
+  setAiGoal(g: string): void;
+  /** saved use cases (localStorage); see useCases.ts and caseActions.ts */
+  cases: CaseBook;
+  /** keep the imported database in this browser's IndexedDB so it loads by itself next time */
+  rememberDb: boolean;
+  setRememberDb(v: boolean): void;
+  /** what is saved right now (null = nothing) */
+  savedDb: SavedDbInfo | null;
+  setSavedDb(i: SavedDbInfo | null): void;
   /** OpenRouter key and model (localStorage only) */
   ai: AiSettings;
   setAi(p: Partial<AiSettings>): void;
@@ -184,6 +202,16 @@ export const useStore = create<State>((set) => ({
   searchDraft: null,
   searchShape: emptyShape(),
   searchJoins: [],
+  aiGoal: "",
+  cases: loadCases(),
+  setAiGoal: (aiGoal) => set({ aiGoal }),
+  rememberDb: loadRememberDb(),
+  setRememberDb: (rememberDb) => {
+    try { localStorage.setItem(REMEMBER_KEY, rememberDb ? "yes" : "no"); } catch { /* private mode */ }
+    set({ rememberDb });
+  },
+  savedDb: null,
+  setSavedDb: (savedDb) => set({ savedDb }),
   ai: loadAi(),
   setAi: (p) =>
     set((s) => {

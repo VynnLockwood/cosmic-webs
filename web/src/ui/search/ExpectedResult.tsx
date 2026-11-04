@@ -12,7 +12,8 @@ export function ExpectedResult({ fetchImpl }: { fetchImpl?: typeof fetch } = {})
   const aiSql = useStore((s) => s.aiSql);
   const setAiSql = useStore((s) => s.setAiSql);
   const setDrawer = useStore((s) => s.setDrawer);
-  const [goal, setGoal] = useState("");
+  const goal = useStore((s) => s.aiGoal);
+  const setGoal = useStore((s) => s.setAiGoal);
   const [runAfter, setRunAfter] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

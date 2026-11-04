@@ -23,7 +23,7 @@
     <div class="scroll">
 <svg viewBox="0 0 1040 488" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="architecture-title architecture-desc">
 <title id="architecture-title">Cosmic Webs architecture</title>
-<desc id="architecture-desc">The browser runs the React and three.js view and a Rust core compiled to WebAssembly in a worker. Requests go over HTTPS to nginx, which proxies them to the FastAPI service. FastAPI runs SQL against the sandbox Postgres and, optionally, a live Postgres, both through read-only roles. For the optional Expected result feature the browser sends table and column names, never rows, straight to OpenRouter with their own key.</desc>
+<desc id="architecture-desc">The browser runs the React and three.js view and a Rust core compiled to WebAssembly in a worker. Requests go over HTTPS to nginx, which proxies them to the FastAPI service. FastAPI runs SQL against the sandbox Postgres and, optionally, a live Postgres, both through read-only roles. The browser itself keeps the imported database file (IndexedDB), use cases and settings (localStorage). For the optional Expected result feature the browser sends table and column names, never rows, straight to OpenRouter with their own key.</desc>
 <defs>
 <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.9" fill="rgba(45,49,66,0.10)"/></pattern>
 <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
@@ -57,6 +57,8 @@
 <text x="696.0" y="305" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SELECT · RO</text>
 <rect x="360" y="244" width="72" height="12" rx="2" fill="#f5f5f5"/>
 <text x="396.0" y="253" fill="#5a6580" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">NAMES ONLY</text>
+<rect x="40" y="332" width="272" height="12" rx="2" fill="#f5f5f5"/>
+<text x="176.0" y="341" fill="#5a6580" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SAVED HERE: DATABASE · USE CASES · SETTINGS</text>
 <rect x="48" y="140" width="256" height="72" rx="6" fill="#f5f5f5"/>
 <rect x="48" y="140" width="256" height="72" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
 <rect x="56" y="148" width="20" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8"/>

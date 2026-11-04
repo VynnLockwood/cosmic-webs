@@ -1,6 +1,11 @@
+import { useState } from "react";
 import { MODEL_EXAMPLES } from "../ai/aiSettings";
 import { RANGES, type VisualSettings } from "../store/visualSettings";
 import { useStore, type TierSetting } from "../store/useStore";
+import { UseCasesTab } from "./UseCasesTab";
+
+const TABS = ["Look", "AI", "Use cases"] as const;
+type Tab = (typeof TABS)[number];
 
 const SLIDERS: { key: keyof VisualSettings; label: string; hint: string; step: number }[] = [
   { key: "starSize", label: "Star size", hint: "size of every star and its spikes", step: 0.05 },
@@ -19,9 +24,17 @@ export function SettingsPanel() {
   const setAi = useStore((s) => s.setAi);
   const forgetAi = useStore((s) => s.forgetAi);
   const s = useStore.getState();
+  const [tab, setTab] = useState<Tab>("Look");
   return (
     <>
       <h2>Settings</h2>
+      <div role="tablist" aria-label="Settings tabs" className="row" style={{ gap: 4 }}>
+        {TABS.map((t) => (
+          <button key={t} role="tab" id={`tab-${t}`} aria-selected={tab === t} aria-controls="settings-tabpanel" className={tab === t ? "btn" : "btn ghost"} onClick={() => setTab(t)}>{t}</button>
+        ))}
+      </div>
+      <div role="tabpanel" id="settings-tabpanel" aria-labelledby={`tab-${tab}`}>
+      {tab === "Look" && <>
       <h3>Look</h3>
       <p style={{ margin: "0 0 6px", color: "var(--ui-muted)" }}>Changes show at once and are saved in this browser.</p>
       {SLIDERS.map(({ key, label, hint, step }) => (
@@ -35,6 +48,18 @@ export function SettingsPanel() {
         </div>
       ))}
       <button className="btn ghost" onClick={resetVisual}>Reset look</button>
+      <h3>Performance</h3>
+      <div className="row">
+        <label htmlFor="tier">Quality</label>
+        <select id="tier" value={tier} onChange={(e) => s.setTier(e.target.value as TierSetting)}>
+          <option value="auto">Auto (measured)</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+        </select>
+      </div>
+      <label className="row" style={{ cursor: "pointer" }}>
+        <input type="checkbox" checked={reduced} onChange={(e) => s.setReducedMotion(e.target.checked)} /> <span>Reduce motion</span>
+      </label>
+      </>}
+      {tab === "AI" && <>
       <h3>AI (OpenRouter)</h3>
       <p style={{ margin: "0 0 6px", color: "var(--ui-muted)" }}>
         Powers <b>Expected result</b> in Search. Your key and model are saved in this browser only (localStorage) and are sent only to openrouter.ai, never to this app's server.
@@ -51,16 +76,9 @@ export function SettingsPanel() {
         <div style={{ color: "var(--ui-muted)", fontSize: 12 }}>Any model id from openrouter.ai/models. The examples are only suggestions.</div>
       </div>
       <button className="btn ghost" onClick={forgetAi} disabled={!ai.apiKey && !ai.model}>Remove key and model</button>
-      <h3>Performance</h3>
-      <div className="row">
-        <label htmlFor="tier">Quality</label>
-        <select id="tier" value={tier} onChange={(e) => s.setTier(e.target.value as TierSetting)}>
-          <option value="auto">Auto (measured)</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
-        </select>
+      </>}
+      {tab === "Use cases" && <UseCasesTab />}
       </div>
-      <label className="row" style={{ cursor: "pointer" }}>
-        <input type="checkbox" checked={reduced} onChange={(e) => s.setReducedMotion(e.target.checked)} /> <span>Reduce motion</span>
-      </label>
     </>
   );
 }

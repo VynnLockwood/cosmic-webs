@@ -7,13 +7,14 @@ them, ranks them by real run time, and tells you what could not be reached and w
 - **3D view** you can orbit, fly into, and search by name (`Ctrl/⌘ K`).
 - **Search builder** with `AND`/`OR`/`NOT`, 18 comparators, `DISTINCT`, `ORDER BY`, `LIMIT`, `GROUP BY`, aggregates and `HAVING`.
 - **Expected result (AI)**: describe what you want to see in plain words; a model of your choice (OpenRouter) drafts the query structure and any SQL the builder cannot say. It sees names only, never rows.
+- **Remembers you**: the database you imported is kept in this browser (IndexedDB) and loads by itself next time; **Use cases** (Settings) save what you want to see together with your settings.
 - **Ranking you can read**: every plan has a score sheet that shows why it is #1.
 - **Structure lab**: add an index or a link, see if the best plan got faster, export the result.
 - **Your data**: upload a `pg_dump` / pgAdmin export (rows included), or connect to a live Postgres read-only.
 
 ## Architecture
 
-![Cosmic Webs architecture: the browser (which can call OpenRouter with the person's own key, sending names only) holds the React and three.js view and a Rust core compiled to WebAssembly; requests go over HTTPS through nginx to a FastAPI service, which runs SQL on the sandbox Postgres and, optionally, your live Postgres through read-only roles.](docs/architecture.svg)
+![Cosmic Webs architecture: the browser (which can call OpenRouter with the person's own key, sending names only) holds the React and three.js view and a Rust core compiled to WebAssembly, and keeps your imported database, use cases and settings in the browser itself; requests go over HTTPS through nginx to a FastAPI service, which runs SQL on the sandbox Postgres and, optionally, your live Postgres through read-only roles.](docs/architecture.svg)
 
 The diagram source is [`docs/architecture.html`](docs/architecture.html) (open it for the web fonts).
 
@@ -51,13 +52,13 @@ The default 25-table shop schema loads on start with a live progress bar.
 
 | | |
 |---|---|
-| **Schema** | Upload a `.sql` file or paste DDL. The graph appears at once; rows load in the background with a progress bar. |
+| **Schema** | Upload a `.sql` file or paste DDL. The graph appears at once; rows load in the background with a progress bar. The file is remembered (see below), so you do not paste it again. |
 | **Data source** | *Sandbox* (default) or *Live Postgres* (read-only, 5 s statement timeout, password kept only in API memory). |
 | **Click a star** | The camera flies in; the panel shows columns (PK/FK) and paged rows. `Esc` flies back. |
 | **Search** | Describe the result in **Expected result** (AI), or pick columns, add conditions, joins and shape yourself. Every column box is a search box; a value box lists the values the column really holds, with counts. |
 | **Results** | Top five plans; **Run** shows up to 200 rows in a scrolling table and says when there are more. Switch **SQL** between *Hardcoded values* (paste into pgAdmin and it runs) and *Params ($1)* (for application code). |
 | **Structure lab** | Indexes, links, columns, data size, one raw DDL statement; *Before / after* table; **Export** (see below). |
-| **Settings** | OpenRouter key and model, star size, star brightness, web line brightness, spin sensitivity (all saved in this browser), quality, reduced motion. |
+| **Settings** | Three tabs. **Look**: star size, star brightness, web line brightness, spin sensitivity, quality, reduced motion. **AI**: OpenRouter key and model. **Use cases**: save and bring back a search with its settings. All saved in this browser. |
 
 Keys: drag = rotate · right-drag = pan · wheel = zoom · `Ctrl/⌘ K` find a table · `/` search · `Esc` back or close · `F` frame all · `+`/`-` zoom · arrows rotate 15°.
 Side panels can be dragged wider or narrower (double-click the handle to reset).
@@ -88,6 +89,29 @@ Write what you want to see, for example *"every customer's name with the total t
 
 Only reading is possible: the API accepts one `SELECT` per query, and the sandbox and live sessions run it through a read-only role in a read-only transaction,
 so `INSERT`, `UPDATE`, `DELETE`, DDL and data-changing `WITH` queries are refused.
+
+### What this browser remembers
+
+Nothing below leaves your browser (the API only sees what you import or run, as before).
+
+| What | Where | Notes |
+|---|---|---|
+| **The database file** you imported | IndexedDB (`cosmos` → `kv`) | Holds big dumps (localStorage stops near 5 MB). It reloads on start, rows included, through the normal import job. If the saved copy no longer loads, the default database is shown with the reason and the copy is kept. *Schema → Forget it* deletes it; *Reset to default* also forgets it; untick *Remember this database* to stop saving. |
+| **Live Postgres** host, port, database, user, schema | localStorage `cosmos.live` | Fills the form. The password is never saved, so you connect again each visit. |
+| **Look, SQL mode, panel widths** | localStorage `cosmos.visual`, `cosmos.sqlMode`, `cosmos.widths` | |
+| **OpenRouter key and model** | localStorage `cosmos.ai` | Sent only to openrouter.ai. |
+| **Use cases** | localStorage `cosmos.cases` | See below. |
+
+Private browsing or a blocked IndexedDB does not break anything: the app works as before and forgets at reload.
+
+### Use cases
+
+*Settings → Use cases* saves a named snapshot of what you want to see: the plain-words wish in **Expected result**, the search builder (columns, filters, shape), your declared joins, the AI's SQL, and your settings (look, SQL mode, panel widths, quality, reduced motion). The OpenRouter key is never copied in.
+
+- **Save current as use case** with a name; the same name replaces the old one.
+- **Apply** brings the search and the settings back and opens Search. Columns that the open database does not have are left out and named.
+- **Rename** and **Delete** per case.
+- *Open the last used one when the app starts* (on by default) restores the last search after the database loads. It does not overwrite your current look settings.
 
 ### Import and suggested links
 

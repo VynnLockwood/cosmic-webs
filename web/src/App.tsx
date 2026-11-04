@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { resetSchema } from "./store/actions";
+import { restoreDatabase } from "./store/actions";
+import { openLastCase } from "./store/caseActions";
 import { useSearchHighlight } from "./search/useHighlight";
 import { motionActions } from "./scene/camera/motion";
 import { SKY_ONLY } from "./scene/e2eHook";
@@ -21,7 +22,8 @@ export default function App() {
   const graph = useStore((s) => s.graph);
   useEffect(() => {
     // the default schema loads as a background job: the graph shows at once, rows and progress follow
-    resetSchema().then(() => {
+    restoreDatabase().then(() => {
+      openLastCase();
       const e = useStore.getState().schemaError;
       if (e && !useStore.getState().graph) setError(e.message);
     });

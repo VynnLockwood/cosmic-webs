@@ -37,6 +37,7 @@ test("the existing quality and motion settings are still there", () => {
 test("OpenRouter key and model are saved in localStorage, the key box hides what you type, and they can be removed", () => {
   useStore.setState({ ai: { apiKey: "", model: "" } });
   render(<SettingsPanel />);
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
   const key = screen.getByLabelText("OpenRouter API key") as HTMLInputElement;
   expect(key.type).toBe("password");
   fireEvent.change(key, { target: { value: "sk-or-abc" } });
@@ -45,4 +46,14 @@ test("OpenRouter key and model are saved in localStorage, the key box hides what
   fireEvent.click(screen.getByRole("button", { name: "Remove key and model" }));
   expect(localStorage.getItem("cosmos.ai")).toBeNull();
   expect(useStore.getState().ai).toEqual({ apiKey: "", model: "" });
+});
+
+test("three tabs: Look is open first, AI and Use cases show only when picked", () => {
+  render(<SettingsPanel />);
+  expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Look", "AI", "Use cases"]);
+  expect(screen.getByRole("tab", { name: "Look" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.queryByLabelText("OpenRouter API key")).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "Use cases" }));
+  expect(screen.getByLabelText("Name")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Star size")).toBeNull();
 });
